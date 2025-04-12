@@ -1,10 +1,12 @@
-import { Schema, model, Types } from "mongoose"
+import { connect } from "mongoose";
 
-const messageSchema = new Schema({
-    message: { type: String, required: true },
-    sender: { type: Types.ObjectId, required: true },
-    receiver: { type: Types.ObjectId, required },
-    file: [String],
-    
+const connectDB = async (uri) => {
+    try {
+        return await connect(uri);
+    } catch (error) {
+        console.error(error);
+        process.exit(1);
+    }
+}
 
-}, { timestamps: true })
+export default connectDB;

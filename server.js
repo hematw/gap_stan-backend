@@ -3,6 +3,7 @@ import express from "express";
 import http from "http";
 import { Server as IOServer } from "socket.io";
 import cors from "cors";
+import connectDB from "./db/connect.js";
 
 dotenv.config();
 
@@ -41,7 +42,8 @@ io.on("connection", (socket) => {
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => {
+server.listen(port, async () => {
+  await connectDB(process.env.MONGO_URI);
   console.log(`🚀 Server & WebSocket running on port ${port}!`);
 });
 

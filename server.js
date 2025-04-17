@@ -4,6 +4,7 @@ import http from "http";
 import { Server as IOServer } from "socket.io";
 import cors from "cors";
 import connectDB from "./db/connect.js";
+import initSocket from "./utils/socket.js";
 
 dotenv.config();
 
@@ -24,24 +25,10 @@ app.get("/", (req, res) => {
 
 
 const server = http.createServer(app);
-const io = new IOServer(server, {
-  cors: { origin: allowedOrigins },
-});
-
-io.on("connection", (socket) => {
-  console.log("New client connected:", socket.id);
-
-  socket.on("message", (msg) => {
-    console.log("Message received:", msg);
-    io.emit("message", msg); // Broadcast to all
-  });
-
-  socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id);
-  });
-});
+const io = initSocket(server)
 
 const port = process.env.PORT || 3000;
+
 server.listen(port, async () => {
   await connectDB(process.env.MONGO_URI);
   console.log(`🚀 Server & WebSocket running on port ${port}!`);

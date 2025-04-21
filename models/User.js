@@ -11,15 +11,16 @@ const User = new mongoose.Schema(
         },
         firstName: {
             type: String,
-            required: [true, "Please provide first name!"],
+            // required: [true, "Please provide first name!"],
         },
         lastName: {
             type: String,
-            required: [true, "Please provide last name!"],
+            // required: [true, "Please provide last name!"],
         },
         phone: {
             type: String,
             // required: [true, "Please provide phone number!"],
+            // unique: true,
         },
         profile: {
             type: String,
@@ -63,4 +64,4 @@ User.methods.generateToken = async function () {
     );
 };
 
-export default mongoose.model < IUser > ("User", User);
+export default mongoose.model ("User", User);

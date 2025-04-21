@@ -5,6 +5,9 @@ import { Server as IOServer } from "socket.io";
 import cors from "cors";
 import connectDB from "./db/connect.js";
 import initSocket from "./utils/socket.js";
+import mainRouter from "./routes/index.js";
+import { error } from "console";
+import errorHandler from "./middlewares/error-handler.js";
 
 dotenv.config();
 
@@ -12,6 +15,9 @@ const app = express();
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || ["http://localhost:5173"];
 
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+app.use(express.static("public"));
 app.use(
   cors({
     origin: allowedOrigins,
@@ -23,6 +29,9 @@ app.get("/", (req, res) => {
   res.send("Welcome to the chat app API!");
 });
 
+app.use("/api", mainRouter)
+
+app.use(errorHandler)
 
 const server = http.createServer(app);
 const io = initSocket(server)

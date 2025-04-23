@@ -37,6 +37,14 @@ const User = new mongoose.Schema(
         bio: {
             type: String,
         },
+        isOnline: {
+            type: Boolean,
+            default: false,
+        },
+        lastSeen: {
+            type: Date,
+            default: Date.now,
+        },
     },
     {
         timestamps: true,
@@ -64,4 +72,4 @@ User.methods.generateToken = async function () {
     );
 };
 
-export default mongoose.model ("User", User);
+export default mongoose.model("User", User);

@@ -4,13 +4,16 @@ const messageSchema = new Schema({
     text: { type: String },
     sender: { type: Types.ObjectId, required: true },
     chat: { type: Types.ObjectId, ref: "Chat", required: true },
-    media: [{ type: String }],
-    mediaType: [{ type: String, enum: ["image", "video", "audio", "file"] }],
+    media: [{ type: Types.ObjectId, ref: "FilesAndMedia" }],
+    // reactions: [{ type: Types.ObjectId, ref: "Reaction" }],
     replyTo: {
         type: Types.ObjectId,
         ref: "Message"
     },
-    reactions: [{ type: Types.ObjectId, ref: "Reaction" }]
+    seenBy: [{
+        type: Types.ObjectId,
+        ref: "User"
+    }],
 }, { timestamps: true })
 
 const Message = model("Message", messageSchema);

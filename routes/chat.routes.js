@@ -1,10 +1,35 @@
 import { Router } from "express";
-import { getChatMessages, getChats } from "../controllers/chat.controller.js";
+import { createChatAndSendMessage, deleteMessage, getChatMessages, getChats, sendMessage } from "../controllers/chat.controller.js";
+import multer from "multer";
+import path from "path";
 
 const chatRouter = Router();
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, './public/chat-media/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname));
+    },
+});
 
 chatRouter.get("/", getChats)
 
 chatRouter.get("/:chatId", getChatMessages)
+
+const upload = multer({ storage });
+
+
+
+chatRouter.put('/deleteMessage/:id', deleteMessage);
+
+chatRouter.get('/', getChats);
+
+chatRouter.get('/:chatId', getChatMessages);
+
+chatRouter.post('/:chatId', upload.array('media'), sendMessage);
+
+chatRouter.post('/new', createChatAndSendMessage);
 
 export default chatRouter; 

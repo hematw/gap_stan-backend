@@ -6,17 +6,17 @@ const ChatSchema = new Schema({
         type: String,
         required: true,
     },
-    isGroupChat: {
+    isGroup: {
         type: Boolean,
         default: false,
     },
-    users: [
+    participants: [
         {
             type: Schema.Types.ObjectId,
             ref: "User",
         },
     ],
-    latestMessage: {
+    lastMessage: {
         type: Schema.Types.ObjectId,
         ref: "Message",
     },
@@ -24,6 +24,8 @@ const ChatSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: "User",
     },
+}, {
+    timestamps: true,
 })
 
 const Chat = model("Chat", ChatSchema);

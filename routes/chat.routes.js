@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { createChatAndSendMessage, deleteMessage, getChatMessages, getChats, sendMessage } from "../controllers/chat.controller.js";
+import { createChatAndSendMessage, deleteMessage, getChatMessages, getChats, searchForChats, sendMessage } from "../controllers/chat.controller.js";
 import multer from "multer";
 import path from "path";
+import authHandler from "../middlewares/auth-handler.js";
 
 const chatRouter = Router();
 
@@ -14,11 +15,15 @@ const storage = multer.diskStorage({
     },
 });
 
+const upload = multer({ storage });
+
+chatRouter.use(authHandler)
+
 chatRouter.get("/", getChats)
 
-chatRouter.get("/:chatId", getChatMessages)
+chatRouter.get("/search", searchForChats)
 
-const upload = multer({ storage });
+chatRouter.get("/:chatId", getChatMessages)
 
 
 

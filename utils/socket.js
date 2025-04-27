@@ -1,4 +1,5 @@
 import { Server as IOServer } from "socket.io";
+import User from "../models/User.js";
 
 let io = null
 export const userSockets = {}
@@ -6,9 +7,11 @@ export const userSockets = {}
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || ["http://localhost:5173"];
 
 export default function initSocket(server) {
-    const io = new IOServer(server, {
-        cors: { origin: allowedOrigins },
-    });
+    if (!io) {
+        io = new IOServer(server, {
+            cors: { origin: allowedOrigins },
+        });
+    }
 
     io.on("connection", (socket) => {
         console.log("New client connected:", socket.id);
@@ -18,8 +21,8 @@ export default function initSocket(server) {
             socket.broadcast.emit("message", msg); // Broadcast to all
         });
 
-        socket.on("user_online", async (userId) => {
-            console.log("User online: 🟡", userId);
+        socket.on("user_online", async ({userId}) => {
+            console.log("User online: 🟢", userId);
             if (userId) {
                 socket.userId = userId;
                 userSockets[userId] = socket;
@@ -29,7 +32,7 @@ export default function initSocket(server) {
                 try {
                     const user = await User.findByIdAndUpdate(userId, {
                         status: "online",
-                        lastSeen: null,
+                        lastSeen: null, 
                     });
                     if (user) {
                         console.log("User status updated to online:", user.fullName);

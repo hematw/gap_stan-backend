@@ -1,13 +1,13 @@
 import dotenv from "dotenv";
 import express from "express";
 import http from "http";
-import { Server as IOServer } from "socket.io";
 import cors from "cors";
 import connectDB from "./db/connect.js";
 import initSocket from "./utils/socket.js";
 import mainRouter from "./routes/index.js";
-import { error } from "console";
 import errorHandler from "./middlewares/error-handler.js";
+import authHandler from "./middlewares/auth-handler.js";
+import morgan from "morgan";
 
 dotenv.config();
 
@@ -25,7 +25,10 @@ app.use(
   })
 );
 
-app.get("/", (req, res) => {
+app.use(morgan("dev"));
+
+app.get("/", authHandler, (req, res) => {
+  console.log("Authenticated user:", req.user)
   res.send("Welcome to the chat app API!");
 });
 

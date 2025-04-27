@@ -1,6 +1,7 @@
 import asyncHandler from "express-async-handler";
 import Chat from "../models/Chat.js";
 import Message from "../models/Message.js";
+import User from "../models/User.js";
 
 
 
@@ -144,9 +145,51 @@ export const deleteMessage = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    const message = await Message.findOneAndDelete({_id: id, sender: userId});
+    const message = await Message.findOneAndDelete({ _id: id, sender: userId });
     if (!message) {
         return res.status(404).json({ error: 'Message not found' });
     }
 
 })
+
+export const searchForChats = asyncHandler(async (req, res) => {
+    const { query } = req.query;
+    const userId = req.user.id;
+
+    const chats = await Chat.find({
+        participants: userId,
+        $or: [
+            { chatName: { $regex: query, $options: 'i' } },
+            { participants: { $elemMatch: { fullName: { $regex: query, $options: 'i' } } } }
+        ]
+    }).populate('participants', 'fullName email profileImage status lastSeen')
+        .populate('lastMessage');
+
+    const otherResults = await User.find({
+        _id: { $ne: userId },
+        username: { $regex: query, $options: 'i' },
+
+    }).select('-password -__v').lean();
+
+    const formattedChats = chats.map(chat => {
+        if (!chat.isGroup) {
+            const otherUser = chat.participants.find(p => p._id.toString() !== userId);
+            return {
+                ...chat.toJSON(),
+                chatName: otherUser.fullName,
+                chatProfile: otherUser.profileImage
+            };
+        }
+        return chat;
+    })
+
+    const formattedOtherResults = otherResults.map(user => {
+        return {
+            ...user,
+            chatName: user.firstName ? `${user.firstName} ${user.lastName}` : user.username,
+            chatProfile: user.profile
+        };
+    })
+
+    res.status(200).json({ chats: formattedChats, otherResults: formattedOtherResults });
+});

@@ -16,9 +16,24 @@ export default function initSocket(server) {
     io.on("connection", (socket) => {
         console.log("New client connected:", socket.id);
 
-        socket.on("message", (msg) => {
-            console.log("Message received:", msg);
-            socket.broadcast.emit("message", msg); // Broadcast to all
+        socket.on("message", ({text, receiver}, cb) => {
+            console.log("Message received:", text, receiver);
+
+            const message = {
+                date: "9 Sep 2024",
+                events: [],
+                chats: [
+                  {
+                    sender: "You",
+                    time: "6:10 PM",
+                    text: text,
+                    isYou: true,
+                  },
+                ],
+              }
+
+            socket.broadcast.emit("message", text); // Broadcast to all
+            cb({message})
         });
 
         socket.on("user_online", async ({userId}) => {

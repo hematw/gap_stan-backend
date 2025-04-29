@@ -1,5 +1,7 @@
 import { Server as IOServer } from "socket.io";
 import User from "../models/User.js";
+import Chat from "../models/Chat.js";
+import Message from "../models/Message.js";
 
 let io = null
 export const userSockets = {}
@@ -16,27 +18,27 @@ export default function initSocket(server) {
     io.on("connection", (socket) => {
         console.log("New client connected:", socket.id);
 
-        socket.on("message", ({text, receiver}, cb) => {
+        socket.on("message", ({ text, receiver }, cb) => {
             console.log("Message received:", text, receiver);
 
             const message = {
                 date: "9 Sep 2024",
                 events: [],
                 chats: [
-                  {
-                    sender: "You",
-                    time: "6:10 PM",
-                    text: text,
-                    isYou: true,
-                  },
+                    {
+                        sender: "You",
+                        time: "6:10 PM",
+                        text: text,
+                        isYou: true,
+                    },
                 ],
-              }
+            }
 
             socket.broadcast.emit("message", text); // Broadcast to all
-            cb({message})
+            cb({ message })
         });
 
-        socket.on("user_online", async ({userId}) => {
+        socket.on("user_online", async ({ userId }) => {
             console.log("User online: 🟢", userId);
             if (userId) {
                 socket.userId = userId;
@@ -47,7 +49,7 @@ export default function initSocket(server) {
                 try {
                     const user = await User.findByIdAndUpdate(userId, {
                         status: "online",
-                        lastSeen: null, 
+                        lastSeen: null,
                     });
                     if (user) {
                         console.log("User status updated to online:", user.fullName);
@@ -60,26 +62,37 @@ export default function initSocket(server) {
             }
         });
 
-        socket.on("send_message", async (message, cb) => {
-            const { chatId, content, mediaType, reactions, userId } = message;
-            console.log("Message received:", message);
+        socket.on("send_message", async ({ chatId, text, mediaType, reactions, senderId, receiverId }, cb) => {
+            // const { chatId, text, mediaType, reactions, userId } = data;
+            // console.log("Message received:", data);
             try {
-                let chatToSendMessage = await Chat.findOne({
-                    _id: chatId,
-                    participants: userId,
-                });
+                let chatToSendMessage;
 
+                if (chatId) {
+                    console.log("Exist ✅")
+                    chatToSendMessage = await Chat.findOne({
+                        _id: chatId,
+                        participants: senderId,
+                    });
+                } else {
+                    console.log("❌ not exist")
+                    chatToSendMessage = await Chat.findOrCreate({
+                        participants: [senderId, receiverId],
+                    }, { participants: [senderId, receiverId] })
+                }
+
+                console.log("chatToSendMessage", chatToSendMessage)
                 if (!chatToSendMessage) {
                     return cb({ error: "Chat not found or user not in chat" });
                 }
 
-                let mediaUrl = null;
+                // let mediaUrl = null;
 
                 const savedMessage = await Message.create({
-                    sender: userId,
+                    sender: senderId,
                     chat: chatToSendMessage._id,
-                    content,
-                    mediaUrl,
+                    text,
+                    // mediaUrl,
                     mediaType: mediaType || 'none',
                     reactions: reactions || [],
                 });
@@ -88,24 +101,24 @@ export default function initSocket(server) {
                 chatToSendMessage.lastMessage = savedMessage._id;
                 await chatToSendMessage.save();
 
-                let otherUser = chatToSendMessage.participants.find(p => p._id.toString() !== userId);
-                const userSocket = userSockets[otherUser._id];
+                let otherUser = chatToSendMessage.participants.find(p => p._id.toString() !== sender);
+                const receiverSocket = userSockets[otherUser._id];
                 chatToSendMessage.lastMessage = savedMessage._id;
                 await chatToSendMessage.save();
 
-                if (userSocket) {
-                    userSocket.emit('receive_message', { ...savedMessage.toJSON(), isYou: false });
+                if (receiverSocket) {
+                    receiverSocket.emit('receive_message', { ...savedMessage.toJSON(), isYou: false });
                 } else {
                     console.log(`${otherUser._id} is offline `, "💀💀💀");
                 }
                 cb({ ...savedMessage.toJSON(), isYou: true });
             } catch (error) {
                 console.error('Error sending message:', error);
-                cb({ error: "Error sending message using socket" });
+                cb({ err: "Error sending message using socket", error });
             }
         });
 
-        socket.on("message_and_create_chat", async (message, cb) => {
+        socket.on("new_chat_message", async (message, cb) => {
             const { receiverId, content, sender, messageType } = message;
             try {
                 const chat = await Chat.create({

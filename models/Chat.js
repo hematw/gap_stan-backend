@@ -1,10 +1,11 @@
 import { model } from "mongoose";
 import { Schema } from "mongoose";
+import findOrCreatePlugin from "mongoose-findorcreate";
 
 const ChatSchema = new Schema({
     chatName: {
         type: String,
-        required: true,
+        // required: true,
     },
     isGroup: {
         type: Boolean,
@@ -24,9 +25,14 @@ const ChatSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: "User",
     },
+    profileImage: {
+        type: String,
+    }
 }, {
     timestamps: true,
 })
+
+ChatSchema.plugin(findOrCreatePlugin)
 
 const Chat = model("Chat", ChatSchema);
 

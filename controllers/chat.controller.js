@@ -9,7 +9,7 @@ export const getChats = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
     const chats = await Chat.find({ participants: userId })
-        .populate('participants', 'fullName email profileImage status lastSeen')
+        .populate('participants', 'firstName lastName username email profileImage isOnline lastSeen')
         .populate('lastMessage');
 
     const formattedChats = chats.map(chat => {
@@ -17,7 +17,7 @@ export const getChats = asyncHandler(async (req, res) => {
             const otherUser = chat.participants.find(p => p._id.toString() !== userId);
             return {
                 ...chat.toJSON(),
-                chatName: otherUser.fullName,
+                chatName: otherUser.firstName ? `${otherUser.firstName} ${otherUser.lastName}` : otherUser.username,
                 chatProfile: otherUser.profileImage
             };
         }

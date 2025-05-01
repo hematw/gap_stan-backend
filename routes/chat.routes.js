@@ -29,10 +29,6 @@ chatRouter.get("/:chatId", getChatMessages)
 
 chatRouter.put('/deleteMessage/:id', deleteMessage);
 
-chatRouter.get('/', getChats);
-
-chatRouter.get('/:chatId', getChatMessages);
-
 chatRouter.post('/:chatId', upload.array('media'), sendMessage);
 
 chatRouter.post('/new', createChatAndSendMessage);

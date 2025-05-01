@@ -81,7 +81,7 @@ export default function initSocket(server) {
                     }, { participants: [senderId, receiverId] })
                 }
 
-                console.log("chatToSendMessage", chatToSendMessage)
+                console.log("chatToSendMessage", chatToSendMessage._id)
                 if (!chatToSendMessage) {
                     return cb({ error: "Chat not found or user not in chat" });
                 }
@@ -101,12 +101,13 @@ export default function initSocket(server) {
                 chatToSendMessage.lastMessage = savedMessage._id;
                 await chatToSendMessage.save();
 
-                let otherUser = chatToSendMessage.participants.find(p => p._id.toString() !== sender);
+                let otherUser = chatToSendMessage.participants.find(p => p._id.toString() !== senderId);
                 const receiverSocket = userSockets[otherUser._id];
                 chatToSendMessage.lastMessage = savedMessage._id;
                 await chatToSendMessage.save();
 
                 if (receiverSocket) {
+                    console.log("User is Online 🔰")
                     receiverSocket.emit('receive_message', { ...savedMessage.toJSON(), isYou: false });
                 } else {
                     console.log(`${otherUser._id} is offline `, "💀💀💀");
@@ -177,7 +178,7 @@ export default function initSocket(server) {
         })
 
         socket.on("disconnect", async () => {
-            console.log("User disconnected:", socket.id);
+            console.log("User disconnected: 😵", socket.id, socket.userId);
             const userId = socket.userId;
             io.emit("user_offline", { userId, lastSeen: new Date() });
             try {

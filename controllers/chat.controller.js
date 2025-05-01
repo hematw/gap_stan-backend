@@ -2,7 +2,15 @@ import asyncHandler from "express-async-handler";
 import Chat from "../models/Chat.js";
 import Message from "../models/Message.js";
 import User from "../models/User.js";
+import Event from "../models/Event.js";
 
+// await Event.create({
+//     type: "user_joined",
+//     chat: "68112a0807ea316e465f7495",
+//     createdBy: "6806a7d0d6f88e410971ee38",
+//     targetUser: "6806ab55a51c4d1efc27f26e",
+//     content: "Someone added you here"
+// })  
 
 
 export const getChats = asyncHandler(async (req, res) => {
@@ -27,37 +35,140 @@ export const getChats = asyncHandler(async (req, res) => {
     res.status(200).json({ chats: formattedChats });
 });
 
-export const getChatMessages = asyncHandler(async (req, res) => {
+// export const getChatMessages = asyncHandler(async (req, res) => {
+//     const { chatId } = req.params;
+//     const userId = req.user.id;
+
+//     const chat = await Chat.findById(chatId)
+//         .populate('participants', 'fullName email profileImage')
+//         .populate('lastMessage');
+
+//     if (!chat) {
+//         return res.status(404).json({ error: 'Chat not found' });
+//     }
+
+//     const messages = await Message.find({ chat: chatId})
+//         .sort({ createdAt: 1 })
+//         .populate('sender', 'fullName email profileImage');
+
+
+//     const events = await Event.find({ chat: chat._id }).lean();
+
+//     const combinedData = [
+//         ...messages,
+//         ...events
+//     ]
+
+//     console.log(combinedData)
+
+//     const sortedData = combinedData.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+//     const formattedMessages = sortedData.map(message => {
+//         // If message.media exist it mean it is a message data
+//         if (message.media) {
+//             if (message.sender._id.toString() !== userId) {
+//                 return {
+//                     ...message.toJSON(),
+//                     isYou: false,
+//                     contentType: "message"
+//                 };
+//             }
+//             return {
+//                 ...message.toJSON(),
+//                 isYou: true,
+//                 contentType: "message"
+//             };
+//         } else {
+//             return {
+//                 ...message,
+//                 contentType: "event"
+//             }
+//         }
+//     });
+
+
+//     res.status(200).json({ chat, messages: formattedMessages });
+// });
+
+// Helper function to label dates
+function formatChatDate(dateString) {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+  
+    const isSameDay = (d1, d2) =>
+      d1.getFullYear() === d2.getFullYear() &&
+      d1.getMonth() === d2.getMonth() &&
+      d1.getDate() === d2.getDate();
+  
+    if (isSameDay(date, today)) return 'Today';
+    if (isSameDay(date, yesterday)) return 'Yesterday';
+  
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  }
+  
+  export const getChatMessages = asyncHandler(async (req, res) => {
     const { chatId } = req.params;
     const userId = req.user.id;
-
+  
     const chat = await Chat.findById(chatId)
-        .populate('participants', 'fullName email profileImage')
-        .populate('lastMessage');
-
+      .populate('participants', 'fullName email profileImage')
+      .populate('lastMessage');
+  
     if (!chat) {
-        return res.status(404).json({ error: 'Chat not found' });
+      return res.status(404).json({ error: 'Chat not found' });
     }
-
-    const messages = await Message.find({ chat: chatId, isDeleted: false })
-        .sort({ createdAt: 1 })
-        .populate('sender', 'fullName email profileImage');
-
-    const formattedMessages = messages.map(message => {
-        if (message.sender._id.toString() !== userId) {
-            return {
-                ...message.toJSON(),
-                isYou: false,
-            };
-        }
+  
+    const messages = await Message.find({ chat: chatId })
+      .sort({ createdAt: 1 })
+      .populate('sender', 'fullName email profileImage');
+  
+    const events = await Event.find({ chat: chat._id }).lean();
+  
+    const combinedData = [...messages, ...events];
+  
+    const sortedData = combinedData.sort(
+      (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+    );
+  
+    const formattedMessages = sortedData.map((message) => {
+      if (message.media || message.text) {
+        // It's a message
         return {
-            ...message.toJSON(),
-            isYou: true,
+          ...message.toJSON(),
+          isYou: message.sender._id.toString() === userId,
+          contentType: 'message'
         };
+      } else {
+        // It's an event
+        return {
+          ...message,
+          contentType: 'event'
+        };
+      }
     });
-
-    res.status(200).json({ chat, messages: formattedMessages });
-});
+  
+    // Group by day
+    const grouped = {};
+    for (const item of formattedMessages) {
+      const label = formatChatDate(item.createdAt);
+      if (!grouped[label]) grouped[label] = [];
+      grouped[label].push(item);
+    }
+  
+    const groupedMessages = Object.entries(grouped).map(([label, items]) => ({
+      label,
+      items
+    }));
+  
+    res.status(200).json({ chat, messages: groupedMessages });
+  });
 
 export const createChatAndSendMessage = asyncHandler(async (req, res) => {
     const { content, mediaType, reactions, receiverId, messageType } = req.body;

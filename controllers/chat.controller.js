@@ -23,10 +23,12 @@ export const getChats = asyncHandler(async (req, res) => {
     const formattedChats = chats.map(chat => {
         if (!chat.isGroup) {
             const otherUser = chat.participants.find(p => p._id.toString() !== userId);
+            const isOnline = otherUser.isOnline;
             return {
                 ...chat.toJSON(),
                 chatName: otherUser.firstName ? `${otherUser.firstName} ${otherUser.lastName}` : otherUser.username,
-                chatProfile: otherUser.profileImage
+                chatProfile: otherUser.profileImage,
+                isOnline
             };
         }
         return chat; // For group chats, keep as is or handle differently
@@ -34,141 +36,84 @@ export const getChats = asyncHandler(async (req, res) => {
 
     res.status(200).json({ chats: formattedChats });
 });
-
-// export const getChatMessages = asyncHandler(async (req, res) => {
-//     const { chatId } = req.params;
-//     const userId = req.user.id;
-
-//     const chat = await Chat.findById(chatId)
-//         .populate('participants', 'fullName email profileImage')
-//         .populate('lastMessage');
-
-//     if (!chat) {
-//         return res.status(404).json({ error: 'Chat not found' });
-//     }
-
-//     const messages = await Message.find({ chat: chatId})
-//         .sort({ createdAt: 1 })
-//         .populate('sender', 'fullName email profileImage');
-
-
-//     const events = await Event.find({ chat: chat._id }).lean();
-
-//     const combinedData = [
-//         ...messages,
-//         ...events
-//     ]
-
-//     console.log(combinedData)
-
-//     const sortedData = combinedData.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-
-//     const formattedMessages = sortedData.map(message => {
-//         // If message.media exist it mean it is a message data
-//         if (message.media) {
-//             if (message.sender._id.toString() !== userId) {
-//                 return {
-//                     ...message.toJSON(),
-//                     isYou: false,
-//                     contentType: "message"
-//                 };
-//             }
-//             return {
-//                 ...message.toJSON(),
-//                 isYou: true,
-//                 contentType: "message"
-//             };
-//         } else {
-//             return {
-//                 ...message,
-//                 contentType: "event"
-//             }
-//         }
-//     });
-
-
-//     res.status(200).json({ chat, messages: formattedMessages });
-// });
-
-// Helper function to label dates
 function formatChatDate(dateString) {
     const date = new Date(dateString);
     const today = new Date();
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
-  
+
     const isSameDay = (d1, d2) =>
-      d1.getFullYear() === d2.getFullYear() &&
-      d1.getMonth() === d2.getMonth() &&
-      d1.getDate() === d2.getDate();
-  
+        d1.getFullYear() === d2.getFullYear() &&
+        d1.getMonth() === d2.getMonth() &&
+        d1.getDate() === d2.getDate();
+
     if (isSameDay(date, today)) return 'Today';
     if (isSameDay(date, yesterday)) return 'Yesterday';
-  
+
     return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
     });
-  }
-  
-  export const getChatMessages = asyncHandler(async (req, res) => {
+}
+
+export const getChatMessages = asyncHandler(async (req, res) => {
     const { chatId } = req.params;
     const userId = req.user.id;
-  
+
     const chat = await Chat.findById(chatId)
-      .populate('participants', 'fullName email profileImage')
-      .populate('lastMessage');
-  
+        .populate('participants', 'fullName email profileImage')
+        .populate('lastMessage');
+
     if (!chat) {
-      return res.status(404).json({ error: 'Chat not found' });
+        return res.status(404).json({ error: 'Chat not found' });
     }
-  
+
     const messages = await Message.find({ chat: chatId })
-      .sort({ createdAt: 1 })
-      .populate('sender', 'fullName email profileImage');
-  
+        .sort({ createdAt: 1 })
+        .populate('sender', 'fullName email profileImage');
+
     const events = await Event.find({ chat: chat._id }).lean();
-  
+
     const combinedData = [...messages, ...events];
-  
+
     const sortedData = combinedData.sort(
-      (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+        (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
     );
-  
+
     const formattedMessages = sortedData.map((message) => {
-      if (message.media || message.text) {
-        // It's a message
-        return {
-          ...message.toJSON(),
-          isYou: message.sender._id.toString() === userId,
-          contentType: 'message'
-        };
-      } else {
-        // It's an event
-        return {
-          ...message,
-          contentType: 'event'
-        };
-      }
+        if (message.media || message.text) {
+            // It's a message
+            return {
+                ...message.toJSON(),
+                isYou: message.sender._id.toString() === userId,
+                contentType: 'message'
+            };
+        } else {
+            // It's an event
+            return {
+                ...message,
+                contentType: 'event'
+            };
+        }
     });
-  
+
     // Group by day
     const grouped = {};
     for (const item of formattedMessages) {
-      const label = formatChatDate(item.createdAt);
-      if (!grouped[label]) grouped[label] = [];
-      grouped[label].push(item);
+        const label = formatChatDate(item.createdAt);
+        if (!grouped[label]) grouped[label] = [];
+        grouped[label].push(item);
     }
-  
+
     const groupedMessages = Object.entries(grouped).map(([label, items]) => ({
-      label,
-      items
+        label,
+        items
     }));
-  
+
     res.status(200).json({ chat, messages: groupedMessages });
-  });
+});
 
 export const createChatAndSendMessage = asyncHandler(async (req, res) => {
     const { content, mediaType, reactions, receiverId, messageType } = req.body;

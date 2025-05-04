@@ -1,5 +1,5 @@
 import asyncHandler from "express-async-handler";
-import User from "../models/User";
+import User from "../models/User.js";
 
 export const getUsers = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, search } = req.query;
@@ -47,13 +47,16 @@ export const getUserById = asyncHandler(async (req, res) => {
 
 export const updateUser = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { username, email, firstName, lastName } = req.body;
+    const updateFields = { ...req.body };
 
-    const updatedUser = await User.findByIdAndUpdate(
-        id,
-        { username, email, firstName, lastName },
-        { new: true }
-    )
+    // If a profile image was uploaded
+    if (req.file) {
+        updateFields.profile = `/uploads/${req.file.filename}`; // or wherever you store it
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(id, updateFields, {
+        new: true,
+    })
         .select("-password")
         .lean();
 
@@ -63,6 +66,7 @@ export const updateUser = asyncHandler(async (req, res) => {
 
     return res.status(200).json(updatedUser);
 });
+
 
 export const deleteUser = asyncHandler(async (req, res) => {
     const { id } = req.params;

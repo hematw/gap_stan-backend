@@ -29,11 +29,11 @@ const storage = multer.diskStorage({
 
 // File filter: accept only images
 const fileFilter = (req, file, cb) => {
-  const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+  const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "audio/webm","video/webm", "application/pdf"];
   if (allowed.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Only image files are allowed!"), false);
+    cb(new Error("Only image, audio, video and pdf files are allowed!"), false);
   }
 };
 
@@ -41,7 +41,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 2 * 1024 * 1024, // 2MB limit
+    fileSize: 5 * 1024 * 1024, // 2MB limit
   },
 });
 

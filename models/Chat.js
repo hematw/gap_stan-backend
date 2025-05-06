@@ -25,7 +25,7 @@ const ChatSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: "User",
     },
-    profileImage: {
+    profile: {
         type: String,
     }
 }, {

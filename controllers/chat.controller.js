@@ -3,6 +3,8 @@ import Chat from "../models/Chat.js";
 import Message from "../models/Message.js";
 import User from "../models/User.js";
 import Event from "../models/Event.js";
+import FilesAndMedia from "../models/FileAndMedia.js";
+import formatChatDate from "../utils/formate-date.js";
 
 // await Event.create({
 //     type: "user_joined",
@@ -17,8 +19,9 @@ export const getChats = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
     const chats = await Chat.find({ participants: userId })
-        .populate('participants', 'firstName lastName username email profileImage isOnline lastSeen')
+        .populate('participants', 'firstName lastName username email profile isOnline lastSeen')
         .populate('lastMessage');
+    console.log(chats[0].participants)
 
     const formattedChats = chats.map(chat => {
         if (!chat.isGroup) {
@@ -26,8 +29,13 @@ export const getChats = asyncHandler(async (req, res) => {
             const isOnline = otherUser.isOnline;
             return {
                 ...chat.toJSON(),
+                lastMessage: {
+                    ...chat.lastMessage?.toJSON(),
+                    isYou: chat.lastMessage?.sender.toString() === userId
+                },
                 chatName: otherUser.firstName ? `${otherUser.firstName} ${otherUser.lastName}` : otherUser.username,
-                chatProfile: otherUser.profileImage,
+                username: otherUser.username,
+                chatProfile: otherUser.profile,
                 isOnline
             };
         }
@@ -36,34 +44,13 @@ export const getChats = asyncHandler(async (req, res) => {
 
     res.status(200).json({ chats: formattedChats });
 });
-function formatChatDate(dateString) {
-    const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(today.getDate() - 1);
-
-    const isSameDay = (d1, d2) =>
-        d1.getFullYear() === d2.getFullYear() &&
-        d1.getMonth() === d2.getMonth() &&
-        d1.getDate() === d2.getDate();
-
-    if (isSameDay(date, today)) return 'Today';
-    if (isSameDay(date, yesterday)) return 'Yesterday';
-
-    return date.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-    });
-}
 
 export const getChatMessages = asyncHandler(async (req, res) => {
     const { chatId } = req.params;
     const userId = req.user.id;
 
     const chat = await Chat.findById(chatId)
-        .populate('participants', 'fullName email profileImage')
+        .populate('participants', 'fullName email profile')
         .populate('lastMessage');
 
     if (!chat) {
@@ -72,7 +59,8 @@ export const getChatMessages = asyncHandler(async (req, res) => {
 
     const messages = await Message.find({ chat: chatId })
         .sort({ createdAt: 1 })
-        .populate('sender', 'fullName email profileImage');
+        .populate("files")
+        .populate('sender', 'firstName lastName username email profile _id').lean();
 
     const events = await Event.find({ chat: chat._id }).lean();
 
@@ -83,10 +71,10 @@ export const getChatMessages = asyncHandler(async (req, res) => {
     );
 
     const formattedMessages = sortedData.map((message) => {
-        if (message.media || message.text) {
+        if (message.files || message.text) {
             // It's a message
             return {
-                ...message.toJSON(),
+                ...message,
                 isYou: message.sender._id.toString() === userId,
                 contentType: 'message'
             };
@@ -218,7 +206,7 @@ export const searchForChats = asyncHandler(async (req, res) => {
             { chatName: { $regex: query, $options: 'i' } },
             { participants: { $elemMatch: { fullName: { $regex: query, $options: 'i' } } } }
         ]
-    }).populate('participants', 'fullName email profileImage status lastSeen')
+    }).populate('participants', 'fullName email profile status lastSeen')
         .populate('lastMessage');
 
     const otherResults = await User.find({
@@ -233,7 +221,7 @@ export const searchForChats = asyncHandler(async (req, res) => {
             return {
                 ...chat.toJSON(),
                 chatName: otherUser.fullName,
-                chatProfile: otherUser.profileImage
+                chatProfile: otherUser.profile
             };
         }
         return chat;
@@ -249,3 +237,54 @@ export const searchForChats = asyncHandler(async (req, res) => {
 
     res.status(200).json({ chats: formattedChats, otherResults: formattedOtherResults });
 });
+
+
+
+const mediaMimeMap = {
+  image: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+  video: ["video/mp4", "video/webm"],
+  audio: ["audio/mpeg", "audio/wav","audio/webm"],
+  file: ["application/pdf"]
+};
+
+export const uploadFiles = async (req, res) => {
+    const sender = req.user.id
+    const chat  = req.params.chatId;
+  try {
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: "No files uploaded." });
+    }
+
+    const filesToSave = [];
+
+    for (const file of req.files) {
+      const { mimetype } = file;
+
+      const mediaType = Object.entries(mediaMimeMap).find(([_, mimes]) =>
+        mimes.includes(mimetype)
+      )?.[0];
+
+      if (!mediaType) {
+        return res.status(400).json({ error: `Unsupported file type: ${file.originalname}` });
+      }
+
+      filesToSave.push({
+        sender,
+        chat,
+        path: `/uploads/${file.filename}`,
+        mediaType: mediaType
+      });
+    }
+
+    const savedFiles = await FilesAndMedia.insertMany(filesToSave);
+
+    res.status(201).json({
+      message: "Files uploaded successfully!",
+      files: savedFiles
+    });
+  } catch (err) {
+    console.error("File upload error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};

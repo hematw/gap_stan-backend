@@ -1,21 +1,9 @@
 import { Router } from "express";
-import { createChatAndSendMessage, deleteMessage, getChatMessages, getChats, searchForChats, sendMessage } from "../controllers/chat.controller.js";
-import multer from "multer";
-import path from "path";
+import { createChatAndSendMessage, deleteMessage, getChatMessages, getChats, searchForChats, sendMessage, uploadFiles } from "../controllers/chat.controller.js";
 import authHandler from "../middlewares/auth-handler.js";
+import upload from "../utils/multer.js";
 
 const chatRouter = Router();
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, './public/chat-media/');
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
-    },
-});
-
-const upload = multer({ storage });
 
 chatRouter.use(authHandler)
 
@@ -28,6 +16,8 @@ chatRouter.get("/:chatId", getChatMessages)
 
 
 chatRouter.put('/deleteMessage/:id', deleteMessage);
+
+chatRouter.post('/:chatId/upload', upload.array("files"), uploadFiles);
 
 chatRouter.post('/:chatId', upload.array('media'), sendMessage);
 

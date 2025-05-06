@@ -62,7 +62,7 @@ export default function initSocket(server) {
             }
         });
 
-        socket.on("send_message", async ({ chatId, text, mediaType, reactions, senderId, receiverId }, cb) => {
+        socket.on("send_message", async ({ chatId, text, files=[], reactions, senderId, receiverId, replayTo }, cb) => {
             // const { chatId, text, mediaType, reactions, userId } = data;
             // console.log("Message received:", data);
             try {
@@ -92,8 +92,8 @@ export default function initSocket(server) {
                     sender: senderId,
                     chat: chatToSendMessage._id,
                     text,
-                    // mediaUrl,
-                    mediaType: mediaType || 'none',
+                    files: files.map(file => file._id),
+                    replayTo,
                     reactions: reactions || [],
                 });
 
@@ -106,14 +106,29 @@ export default function initSocket(server) {
                 chatToSendMessage.lastMessage = savedMessage._id;
                 await chatToSendMessage.save();
 
-                console.log(userSockets)
+                const sender = await User.findById(senderId);
+
                 if (receiverSocket) {
                     console.log("User is Online 🔰")
-                    receiverSocket.emit('receive_message', { ...savedMessage.toJSON(), isYou: false });
+                    receiverSocket.emit('receive_message', {
+                        ...savedMessage.toJSON(),
+                        isYou: false,
+                        sender: sender || senderId,
+                        files
+                    });
                 } else {
                     console.log(`${otherUser._id} is offline `, "💀💀💀");
                 }
-                cb({ message: "Message sent.", data: { ...savedMessage.toJSON(), isYou: true } });
+
+                cb({
+                    message: "Message sent.",
+                    data: {
+                        ...savedMessage.toJSON(),
+                        isYou: true,
+                        sender: sender || senderId,
+                        files
+                    }
+                });
             } catch (error) {
                 console.error('Error sending message:', error);
                 cb({ message: "Error sending message using socket", error });
@@ -139,7 +154,7 @@ export default function initSocket(server) {
 
                 // 👉 Re-fetch with populated participants
                 const populatedChat = await Chat.findById(chat._id)
-                    .populate("participants", "fullName profileImage email")
+                    .populate("participants", "fullName profile email")
                     .populate("lastMessage");
 
                 const receiverSocket = userSockets[receiverId];
@@ -160,7 +175,7 @@ export default function initSocket(server) {
                             return {
                                 ...chat.toJSON(),
                                 chatName: otherUser.fullName,
-                                chatProfile: otherUser.profileImage
+                                chatProfile: otherUser.profile
                             };
                         }
                         return chat;

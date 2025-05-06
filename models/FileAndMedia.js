@@ -6,12 +6,17 @@ const filesAndMediaSchema = new Schema({
         ref: "User",
         required: [true, "Sender of file should be known"]
     },
+    chat: {
+        type: Types.ObjectId,
+        ref: "Chat",
+        required: [true, "Chat ID of file should be known"]
+    },
     path: {
         type: String,
         required: [true, "File path is required"]
     },
-    mediaType: [{ type: String, enum: ["image", "video", "audio", "file"] }],
+    mediaType: { type: String, enum: ["image", "video", "audio", "file"] },
 }, { timestamps: true })
 
-const FilesAndMedia = model(filesAndMediaSchema)
+const FilesAndMedia = model("FilesAndMedia", filesAndMediaSchema)
 export default FilesAndMedia

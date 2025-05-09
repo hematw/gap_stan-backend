@@ -27,9 +27,14 @@ app.use(
 
 app.use(morgan("dev"));
 
-app.get("/", authHandler, (req, res) => {
-  console.log("Authenticated user:", req.user)
+app.get("/", (req, res) => {
+  console.log("Whooho you came to Home.")
   res.send("Welcome to the chat app API!");
+});
+
+app.get("/secure", authHandler, (req, res) => {
+  console.log("Authenticated user:", req.user)
+  res.send("This route was really secure!");
 });
 
 app.use("/api", mainRouter)

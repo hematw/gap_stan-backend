@@ -193,6 +193,13 @@ export default function initSocket(server) {
             }
         })
 
+        socket.on("typing", ({ chatId, userId, isTyping, timestamp }) => {
+            console.log(`User ${userId} is ${isTyping ? "typing" : "not typing"} in chat ${chatId} at ${timestamp}`);
+
+            // Broadcast typing event to other participants in the chat
+            socket.broadcast.emit("typing", { chatId, userId, isTyping, timestamp });
+        });
+
         socket.on("disconnect", async () => {
             console.log("User disconnected: 😵", socket.id, socket.userId);
             const userId = socket.userId;

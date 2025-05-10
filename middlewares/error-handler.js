@@ -26,7 +26,7 @@ const errorHandler = (
     });
   }
   // else if(err instanceof )
-  res.status(400).json({ err });
+  res.status(500).json({ err });
 };
 
 export default errorHandler;

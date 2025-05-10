@@ -21,7 +21,6 @@ export const getChats = asyncHandler(async (req, res) => {
     const chats = await Chat.find({ participants: userId })
         .populate('participants', 'firstName lastName username email profile isOnline lastSeen')
         .populate('lastMessage');
-    console.log(chats[0].participants)
 
     const formattedChats = chats.map(chat => {
         if (!chat.isGroup) {

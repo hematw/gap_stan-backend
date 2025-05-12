@@ -19,10 +19,11 @@ export const getChats = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
     const chats = await Chat.find({ participants: userId })
-        .populate('participants', 'firstName lastName username email profile isOnline lastSeen')
+        .populate('participants', 'firstName lastName username email profile isOnline lastSeen bio')
         .populate('lastMessage');
 
     const formattedChats = chats.map(chat => {
+        console.log(chat)
         if (!chat.isGroup) {
             const otherUser = chat.participants.find(p => p._id.toString() !== userId);
             const isOnline = otherUser.isOnline;
@@ -35,6 +36,8 @@ export const getChats = asyncHandler(async (req, res) => {
                 chatName: otherUser.firstName ? `${otherUser.firstName} ${otherUser.lastName}` : otherUser.username,
                 username: otherUser.username,
                 chatProfile: otherUser.profile,
+                bio: otherUser.bio,
+                lastSeen: otherUser.lastSeen,
                 isOnline
             };
         }
@@ -240,50 +243,55 @@ export const searchForChats = asyncHandler(async (req, res) => {
 
 
 const mediaMimeMap = {
-  image: ["image/jpeg", "image/png", "image/webp", "image/gif"],
-  video: ["video/mp4", "video/webm"],
-  audio: ["audio/mpeg", "audio/wav","audio/webm"],
-  file: ["application/pdf"]
+    image: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+    video: ["video/mp4", "video/webm"],
+    audio: ["audio/mpeg", "audio/wav", "audio/webm"],
+    file: ["application/pdf"]
 };
 
 export const uploadFiles = async (req, res) => {
     const sender = req.user.id
-    const chat  = req.params.chatId;
-  try {
+    const chat = req.params.chatId;
+    try {
 
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: "No files uploaded." });
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: "No files uploaded." });
+        }
+
+        const filesToSave = [];
+
+        for (const file of req.files) {
+            const { mimetype } = file;
+
+            const mediaType = Object.entries(mediaMimeMap).find(([_, mimes]) =>
+                mimes.includes(mimetype)
+            )?.[0];
+
+            if (!mediaType) {
+                return res.status(400).json({ error: `Unsupported file type: ${file.originalname}` });
+            }
+
+            if (!chat) {
+                const { receiver } = req.query;
+                const newChat = await Chat.findOrCreate({ participants: [sender, receiver] })
+            }
+
+            filesToSave.push({
+                sender,
+                chat: chat || newChat._id,
+                path: `/uploads/${file.filename}`,
+                mediaType: mediaType
+            });
+        }
+
+        const savedFiles = await FilesAndMedia.insertMany(filesToSave);
+
+        res.status(201).json({
+            message: "Files uploaded successfully!",
+            files: savedFiles
+        });
+    } catch (err) {
+        console.error("File upload error:", err);
+        res.status(500).json({ error: "Internal server error" });
     }
-
-    const filesToSave = [];
-
-    for (const file of req.files) {
-      const { mimetype } = file;
-
-      const mediaType = Object.entries(mediaMimeMap).find(([_, mimes]) =>
-        mimes.includes(mimetype)
-      )?.[0];
-
-      if (!mediaType) {
-        return res.status(400).json({ error: `Unsupported file type: ${file.originalname}` });
-      }
-
-      filesToSave.push({
-        sender,
-        chat,
-        path: `/uploads/${file.filename}`,
-        mediaType: mediaType
-      });
-    }
-
-    const savedFiles = await FilesAndMedia.insertMany(filesToSave);
-
-    res.status(201).json({
-      message: "Files uploaded successfully!",
-      files: savedFiles
-    });
-  } catch (err) {
-    console.error("File upload error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
 };

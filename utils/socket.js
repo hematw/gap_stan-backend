@@ -38,13 +38,24 @@ export default function initSocket(server) {
             cb({ message })
         });
 
-        socket.on("user_online", async ({ userId, isOnline }) => {
+        socket.on("user-online", async ({ userId, isOnline }) => {
             console.log("User online: 🟢", userId);
+
+            const userChats = await Chat.find({ participants: userId }).select("_id");
+
+            const chatsIds = userChats.map(chat => chat._id);
+            await Message.updateMany({
+                chat: {
+                    $in: chatsIds,
+                },
+                status: "sent"
+            }, { status: "delivered" })
+
             if (userId) {
                 socket.userId = userId;
                 userSockets[userId] = socket;
                 console.log(`User ${userId} registered with socket ID ${socket.id} 🆔`);
-                socket.broadcast.emit("update_status", { userId, isOnline });
+                socket.broadcast.emit("update-status", { userId, isOnline });
 
                 try {
                     const user = await User.findByIdAndUpdate(userId, {
@@ -62,7 +73,7 @@ export default function initSocket(server) {
             }
         });
 
-        socket.on("send_message", async ({ chatId, text, files=[], reactions, senderId, receiverId, replayTo }, cb) => {
+        socket.on("send-message", async ({ chatId, text, files = [], reactions, senderId, receiverId, replayTo }, cb) => {
             // const { chatId, text, mediaType, reactions, userId } = data;
             // console.log("Message received:", data);
             try {
@@ -110,7 +121,7 @@ export default function initSocket(server) {
 
                 if (receiverSocket) {
                     console.log("User is Online 🔰")
-                    receiverSocket.emit('receive_message', {
+                    receiverSocket.emit('message-received', {
                         ...savedMessage.toJSON(),
                         isYou: false,
                         sender: sender || senderId,
@@ -135,7 +146,7 @@ export default function initSocket(server) {
             }
         });
 
-        socket.on("new_chat_message", async (message, cb) => {
+        socket.on("new-chat-message", async (message, cb) => {
             const { receiverId, content, sender, messageType } = message;
             try {
                 const chat = await Chat.create({
@@ -182,7 +193,7 @@ export default function initSocket(server) {
                     }
 
                     receiverSocket.emit("new_chat", formatChat(populatedChat));
-                    // receiverSocket.emit("receive_message", { ...newMessage.toJSON(), isYou: false });
+                    // receiverSocket.emit("message_received", { ...newMessage.toJSON(), isYou: false });
                 } else {
                     console.log(`${receiverId} is offline `, "💀💀💀");
                 }
@@ -200,10 +211,34 @@ export default function initSocket(server) {
             socket.broadcast.emit("typing", { chatId, userId, isTyping, timestamp });
         });
 
+        socket.on("message-delivered", async ({ messageId }) => {
+            const message = await Message.findById(messageId);
+            if (message) {
+                message.status = "delivered"
+                await message.save()
+            } else {
+                console.error(`Message with id ${messageId} NOT found`)
+            }
+        })
+
+        socket.on("mark-as-seen", async ({ chatId }) => {
+            const chat = await Chat.findById(chatId);
+
+            if (chat) {
+                await Message.updateMany({
+                    chat: chat._id,
+                    status: { $ne: "seen" },
+                    sender: { $ne: socket.userId }
+                }, { status: "seen" });
+            } else {
+                console.error(`Chat with id ${chatId} NOT found`)
+            }
+        })
+
         socket.on("disconnect", async () => {
             console.log("User disconnected: 😵", socket.id, socket.userId);
             const userId = socket.userId;
-            socket.broadcast.emit("update_status", { userId, isOnline: false, lastSeen: new Date() });
+            socket.broadcast.emit("update-status", { userId, isOnline: false, lastSeen: new Date() });
             try {
                 const user = await User.findByIdAndUpdate(userId, {
                     isOnline: false,

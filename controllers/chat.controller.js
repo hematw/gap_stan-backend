@@ -133,7 +133,7 @@ export const createChatAndSendMessage = asyncHandler(async (req, res) => {
         });
 
         sendNotification(receiverId, notification);
-        receiverSocket.emit("receive_message", { ...newMessage.toJSON(), isYou: false });
+        receiverSocket.emit("message_received", { ...newMessage.toJSON(), isYou: false });
     }
     res.status(201).send({ message: { ...newMessage.toJSON(), isYou: true }, chat });
 });

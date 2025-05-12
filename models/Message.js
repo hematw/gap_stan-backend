@@ -14,6 +14,11 @@ const messageSchema = new Schema({
         type: Types.ObjectId,
         ref: "User"
     }],
+    status: {
+        type: String,
+        enum: ["sent", "delivered", "seen"],
+        default: "sent"
+    }
 }, { timestamps: true })
 
 const Message = model("Message", messageSchema);

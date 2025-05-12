@@ -15,9 +15,6 @@ const app = express();
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || ["http://localhost:5173"];
 
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
-app.use(express.static("public"));
 app.use(
   cors({
     origin: allowedOrigins,
@@ -25,6 +22,9 @@ app.use(
   })
 );
 
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+app.use(express.static("public"));
 app.use(morgan("dev"));
 
 app.get("/", (req, res) => {

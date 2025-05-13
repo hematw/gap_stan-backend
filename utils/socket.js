@@ -114,13 +114,13 @@ export default function initSocket(server) {
 
                 let otherUser = chatToSendMessage.participants.find(p => p._id.toString() !== senderId);
                 const receiverSocket = userSockets[otherUser._id];
-                chatToSendMessage.lastMessage = savedMessage._id;
-                await chatToSendMessage.save();
 
                 const sender = await User.findById(senderId);
 
                 if (receiverSocket) {
                     console.log("User is Online 🔰")
+                    savedMessage.status = "delivered"
+                    await savedMessage.save()
                     receiverSocket.emit('message-received', {
                         ...savedMessage.toJSON(),
                         isYou: false,

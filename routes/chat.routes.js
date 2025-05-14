@@ -23,4 +23,6 @@ chatRouter.post('/:chatId', upload.array('media'), sendMessage);
 
 chatRouter.post('/new', createChatAndSendMessage);
 
+chatRouter.post('/group', upload.single("profile"),  createChatAndSendMessage);
+
 export default chatRouter; 

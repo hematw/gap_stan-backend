@@ -22,7 +22,7 @@ const ChatSchema = new Schema({
         ref: "Message",
     },
     groupAdmin: {
-        type: Schema.Types.ObjectId,
+        type: [Schema.Types.ObjectId],
         ref: "User",
     },
     profile: {

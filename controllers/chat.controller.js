@@ -295,3 +295,32 @@ export const uploadFiles = async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 };
+
+export const createGroup = asyncHandler(async (req, res) => {
+    const { chatName, members: participants } = req.body;
+
+    if (!chatName || participants.length < 2) {
+        return res.status(400).json({ error: "Group needs a name and at least 3 members" });
+    }
+
+    console.log(chatName, participants)
+
+    const createdBy = req.user.id;
+
+    let path;
+    if (req.file) {
+        path = `/uploads/${req.file.originalname}`
+    }
+
+    const groupChat = await Chat.create({
+        chatName,
+        isGroup: true,
+        participants,
+        createdBy,
+        groupAdmin: createdBy,
+        profile: path
+    });
+
+    res.status(201).json(groupChat);
+
+})

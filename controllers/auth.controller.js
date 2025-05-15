@@ -1,5 +1,6 @@
 import asyncHandler from "express-async-handler";
 import User from "../models/User.js";
+import sendMail from "../utils/email-sender.js";
 
 const cookieOptions = {
     maxAge: 7 * 24 * 60 * 60 * 1000, // seven days
@@ -22,6 +23,7 @@ export const registerUser = asyncHandler(
             // lastName,
         });
         const token = await createdUser.generateToken();
+        sendMail(createdUser, token);
         return res
             .status(200)
             .cookie("token", token, cookieOptions)

@@ -20,10 +20,9 @@ export const getChats = asyncHandler(async (req, res) => {
 
     const chats = await Chat.find({ participants: userId })
         .populate('participants', 'firstName lastName username email profile isOnline lastSeen bio')
-        .populate('lastMessage');
+        .populate('lastMessage').sort({createdAt:-1});
 
     const formattedChats = chats.map(chat => {
-        console.log(chat)
         if (!chat.isGroup) {
             const otherUser = chat.participants.find(p => p._id.toString() !== userId);
             const isOnline = otherUser.isOnline;
@@ -303,8 +302,6 @@ export const createGroup = asyncHandler(async (req, res) => {
         return res.status(400).json({ error: "Group needs a name and at least 3 members" });
     }
 
-    console.log(chatName, participants)
-
     const createdBy = req.user.id;
 
     let path;
@@ -315,7 +312,7 @@ export const createGroup = asyncHandler(async (req, res) => {
     const groupChat = await Chat.create({
         chatName,
         isGroup: true,
-        participants,
+        participants: [...participants, req.user.id],
         createdBy,
         groupAdmin: createdBy,
         profile: path

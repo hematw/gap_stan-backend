@@ -70,51 +70,56 @@ const handleUserOnline = async (socket, { userId, isOnline }) => {
             lastSeen: null,
         });
         if (user) {
-            console.log("User status updated to online:", user.fullName);
+            console.log("User status updated to online:", user.username);
         } else {
             console.log("User not found:", userId);
         }
-    } catch (error) {
-        console.error("Error updating user status:", error);
-    }
 
-    // 👇 Update all messages sent to this user that are still in "sent" status
-    const chats = await Chat.find({ participants: userId }).select(
-        "_id participants"
-    );
+        // 👇 Update all messages sent to this user that are still in "sent" status
+        const chats = await Chat.find({ participants: userId }).select(
+            "_id participants isGroup "
+        );
 
-    for (const chat of chats) {
-        const messagesToUpdate = await Message.find({
-            chat: chat._id,
-            status: "sent",
-            sender: { $ne: userId },
-        }).select("_id sender");
+        for (const chat of chats) {
+            const messagesToUpdate = await Message.find({
+                chat: chat._id,
+                status: "sent",
+                sender: { $ne: userId },
+            }).select("_id sender");
 
-        if (messagesToUpdate.length > 0) {
-            const messageIds = messagesToUpdate.map((m) => m._id);
+            if (messagesToUpdate.length > 0) {
+                const messageIds = messagesToUpdate.map((m) => m._id);
 
-            await Message.updateMany(
-                { _id: { $in: messageIds } },
-                { status: "delivered" }
-            );
+                await Message.updateMany(
+                    { _id: { $in: messageIds } },
+                    { status: "delivered" }
+                );
 
-            // 🔔 Notify the senders of those messages (only the senders)
-            const groupedBySender = {};
-            for (const msg of messagesToUpdate) {
-                if (!groupedBySender[msg.sender]) groupedBySender[msg.sender] = [];
-                groupedBySender[msg.sender].push(msg._id);
-            }
+                // 🔔 Notify the senders of those messages (only the senders)
+                const groupedBySender = {};
+                for (const msg of messagesToUpdate) {
+                    if (!groupedBySender[msg.sender]) groupedBySender[msg.sender] = [];
+                    groupedBySender[msg.sender].push(msg._id);
+                }
 
-            for (const [senderId, msgIds] of Object.entries(groupedBySender)) {
-                const senderSocket = userSockets[senderId];
-                if (senderSocket) {
-                    senderSocket.emit("messages-delivered", {
-                        chatId: chat._id,
-                        messageIds: msgIds,
-                    });
+                for (const [senderId, msgIds] of Object.entries(groupedBySender)) {
+                    const senderSocket = userSockets[senderId];
+                    if (senderSocket) {
+                        senderSocket.emit("messages-delivered", {
+                            chatId: chat._id,
+                            messageIds: msgIds,
+                        });
+                    }
                 }
             }
+
+            if (chat.isGroup) {
+                socket.join(chat._id.toString())
+                console.log(userId, `joined to group room ${chat._id}`)
+            }
         }
+    } catch (error) {
+        console.error("Error updating user status:", error);
     }
 }
 
@@ -168,16 +173,29 @@ const handleSendMessage = async (socket,
                 _id: chatId,
                 participants: senderId,
             });
+
+
         } else {
             console.log("❌ not exist");
-            chatToSendMessage = await Chat.findOrCreate(
+            const { doc, created } = await Chat.findOrCreate(
                 {
                     participants: [senderId, receiverId],
                 },
-                { participants: [senderId, receiverId] }
+                { participants: [senderId, receiverId] },
             );
-        }
+            console.log(chatToSendMessage)
+            chatToSendMessage = doc;
 
+            if (created) {
+                const participantWithoutSender = doc.participants.filter(p => p.toString() != socket.userId)
+                for (const participant of participantWithoutSender) {
+                    const participantSocket = userSockets[participant.toJSON()]
+                    if (participantSocket) {
+                        participantSocket.emit("new-chat", doc)
+                    }
+                }
+            }
+        }
         console.log("chatToSendMessage", chatToSendMessage._id);
         if (!chatToSendMessage) {
             return cb({ error: "Chat not found or user not in chat" });
@@ -197,25 +215,36 @@ const handleSendMessage = async (socket,
         chatToSendMessage.lastMessage = savedMessage._id;
         await chatToSendMessage.save();
 
-        let otherUser = chatToSendMessage.participants.find(
-            (p) => p._id.toString() !== senderId
-        );
-        const receiverSocket = userSockets[otherUser._id];
-
         const sender = await User.findById(senderId);
 
-        if (receiverSocket) {
-            console.log("User is Online 🔰");
-            savedMessage.status = "delivered";
-            await savedMessage.save();
-            receiverSocket.emit("message-received", {
+        if (chatToSendMessage.isGroup) {
+            socket.to(chatToSendMessage._id.toString()).emit("message-received", {
                 ...savedMessage.toJSON(),
                 isYou: false,
                 sender: sender || senderId,
                 files,
-            });
+            })
         } else {
-            console.log(`${otherUser._id} is offline `, "💀💀💀");
+
+
+            let otherUser = chatToSendMessage.participants.find(
+                (p) => p._id.toString() !== senderId
+            );
+            const receiverSocket = userSockets[otherUser._id];
+
+            if (receiverSocket) {
+                console.log("User is Online 🔰");
+                savedMessage.status = "delivered";
+                await savedMessage.save();
+                receiverSocket.emit("message-received", {
+                    ...savedMessage.toJSON(),
+                    isYou: false,
+                    sender: sender || senderId,
+                    files,
+                });
+            } else {
+                console.log(`${otherUser._id} is offline `, "💀💀💀");
+            }
         }
 
         cb({

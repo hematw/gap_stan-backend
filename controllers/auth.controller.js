@@ -28,7 +28,8 @@ export const registerUser = asyncHandler(async (req, res) => {
   createdUser.otpExpiry = Date.now() + 5 * 60 * 60 * 1000; // 5 minutes
   await createdUser.save();
 
-  sendMail(createdUser, otp);
+  const x = await sendMail(createdUser, otp);
+  console.log(x)
   return res
     .status(200)
     .json({ email: createdUser.email, username: createdUser.username });
@@ -47,7 +48,13 @@ export const loginUser = asyncHandler(async (req, res) => {
   const foundUser = await User.findOne({
     $or: [{ email }, { username: email }],
   });
+
+  if (!foundUser.verifiedAt) { 
+    return res.status(401).json({message: "Please verify your account first."})
+  }
+
   if (foundUser && (await foundUser.isPasswordCorrect(password))) {
+
     const token = await foundUser.generateToken();
     return res
       .status(200)
@@ -65,7 +72,7 @@ export const logoutUser = asyncHandler(async (req, res) => {
     .json({ message: "Logged out successfully" });
 });
 
-export const checkUsername = asyncHandler(async () => {
+export const checkUsername = asyncHandler(async (req, res) => {
   const { username } = req.params;
 
   const user = await User.findOne({ username });
@@ -75,3 +82,19 @@ export const checkUsername = asyncHandler(async () => {
     return res.status(409).json({ message: "Username is available!" });
   }
 });
+
+export const verifyOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  const user = await User.findOne({ email: email, otp: otp })
+
+  const isExpired = (User.otpExpiry - Date.now()) > 0;
+
+  if (!isExpired) {
+    user.verifiedAt = Date.now()
+    await user.save()
+    const token = await user.generateToken()
+    return res.status(200).json({ user, token })
+  }
+  return res.status(401).json({ message: "Verification failed" })
+})

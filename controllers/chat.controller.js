@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import Event from "../models/Event.js";
 import FilesAndMedia from "../models/FileAndMedia.js";
 import formatChatDate from "../utils/formate-date.js";
+import { io, userSockets } from "../utils/socket.js";
 
 // await Event.create({
 //     type: "user_joined",
@@ -18,13 +19,13 @@ import formatChatDate from "../utils/formate-date.js";
 export const getChats = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
-    const chats = await Chat.find({ participants: userId })
-        .populate('participants', 'firstName lastName username email profile isOnline lastSeen bio')
-        .populate('lastMessage').sort({createdAt:-1});
+    const chats = await Chat.find({ members: userId })
+        .populate('members', 'firstName lastName username email profile isOnline lastSeen bio')
+        .populate('lastMessage').sort({ createdAt: -1 });
 
     const formattedChats = chats.map(chat => {
         if (!chat.isGroup) {
-            const otherUser = chat.participants.find(p => p._id.toString() !== userId);
+            const otherUser = chat.members.find(p => p._id.toString() !== userId);
             const isOnline = otherUser.isOnline;
             return {
                 ...chat.toJSON(),
@@ -34,7 +35,7 @@ export const getChats = asyncHandler(async (req, res) => {
                 },
                 chatName: otherUser.firstName ? `${otherUser.firstName} ${otherUser.lastName}` : otherUser.username,
                 username: otherUser.username,
-                chatProfile: otherUser.profile,
+                profile: otherUser.profile,
                 bio: otherUser.bio,
                 lastSeen: otherUser.lastSeen,
                 isOnline
@@ -51,7 +52,7 @@ export const getChatMessages = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
     const chat = await Chat.findById(chatId)
-        .populate('participants', 'fullName email profile')
+        .populate('members', 'fullName email profile')
         .populate('lastMessage');
 
     if (!chat) {
@@ -109,7 +110,7 @@ export const createChatAndSendMessage = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
     const chat = await Chat.findOrCreate({
-        participants: [receiverId, userId],
+        members: [receiverId, userId],
     });
 
     const newMessage = await Message.create({
@@ -149,7 +150,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
     let chatToSendMessage = await Chat.findOne({
         _id: chatId,
-        participants: userId,
+        members: userId,
     });
 
     if (!chatToSendMessage) {
@@ -175,7 +176,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     chatToSendMessage.lastMessage = savedMessage._id;
     await chatToSendMessage.save();
 
-    let otherUser = chatToSendMessage.participants.find(p => p._id.toString() !== userId);
+    let otherUser = chatToSendMessage.members.find(p => p._id.toString() !== userId);
     const userSocket = userSockets[otherUser._id];
     if (userSocket) {
         userSocket.emit('receiveMessage', { ...savedMessage.toJSON(), isYou: false });
@@ -202,12 +203,12 @@ export const searchForChats = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
     const chats = await Chat.find({
-        participants: userId,
+        members: userId,
         $or: [
             { chatName: { $regex: query, $options: 'i' } },
-            { participants: { $elemMatch: { fullName: { $regex: query, $options: 'i' } } } }
+            { members: { $elemMatch: { fullName: { $regex: query, $options: 'i' } } } }
         ]
-    }).populate('participants', 'fullName email profile status lastSeen')
+    }).populate('members', 'fullName email profile status lastSeen')
         .populate('lastMessage');
 
     const otherResults = await User.find({
@@ -218,11 +219,11 @@ export const searchForChats = asyncHandler(async (req, res) => {
 
     const formattedChats = chats.map(chat => {
         if (!chat.isGroup) {
-            const otherUser = chat.participants.find(p => p._id.toString() !== userId);
+            const otherUser = chat.members.find(p => p._id.toString() !== userId);
             return {
                 ...chat.toJSON(),
                 chatName: otherUser.fullName,
-                chatProfile: otherUser.profile
+                profile: otherUser.profile
             };
         }
         return chat;
@@ -232,7 +233,7 @@ export const searchForChats = asyncHandler(async (req, res) => {
         return {
             ...user,
             chatName: user.firstName ? `${user.firstName} ${user.lastName}` : user.username,
-            chatProfile: user.profile
+            profile: user.profile
         };
     })
 
@@ -272,7 +273,7 @@ export const uploadFiles = async (req, res) => {
 
             if (!chat) {
                 const { receiver } = req.query;
-                const newChat = await Chat.findOrCreate({ participants: [sender, receiver] })
+                const newChat = await Chat.findOrCreate({ members: [sender, receiver] })
             }
 
             filesToSave.push({
@@ -296,9 +297,9 @@ export const uploadFiles = async (req, res) => {
 };
 
 export const createGroup = asyncHandler(async (req, res) => {
-    const { chatName, members: participants } = req.body;
+    const { chatName, members: members } = req.body;
 
-    if (!chatName || participants.length < 2) {
+    if (!chatName || members.length < 2) {
         return res.status(400).json({ error: "Group needs a name and at least 3 members" });
     }
 
@@ -312,12 +313,21 @@ export const createGroup = asyncHandler(async (req, res) => {
     const groupChat = await Chat.create({
         chatName,
         isGroup: true,
-        participants: [...participants, req.user.id],
+        members: [...members, req.user.id],
         createdBy,
         groupAdmin: createdBy,
         profile: path
     });
 
-    res.status(201).json(groupChat);
+    for (const member of groupChat.members) {
+        const memberSocket = userSockets[member.toString()]
+        console.log("MMMMMMM", member)
+        if (memberSocket) {
+            console.log("LLLLLL", memberSocket)
+            memberSocket.join(groupChat._id);
+            io.to(groupChat._id).emit("new-chat", groupChat)
+        }
+    }
 
+    res.status(201).json(groupChat);
 })

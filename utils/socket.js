@@ -76,8 +76,8 @@ const handleUserOnline = async (socket, { userId, isOnline }) => {
         }
 
         // 👇 Update all messages sent to this user that are still in "sent" status
-        const chats = await Chat.find({ participants: userId }).select(
-            "_id participants isGroup "
+        const chats = await Chat.find({ members: userId }).select(
+            "_id members isGroup "
         );
 
         for (const chat of chats) {
@@ -171,7 +171,7 @@ const handleSendMessage = async (socket,
             console.log("Exist ✅");
             chatToSendMessage = await Chat.findOne({
                 _id: chatId,
-                participants: senderId,
+                members: senderId,
             });
 
 
@@ -179,19 +179,22 @@ const handleSendMessage = async (socket,
             console.log("❌ not exist");
             const { doc, created } = await Chat.findOrCreate(
                 {
-                    participants: [senderId, receiverId],
+                    members: [senderId, receiverId],
                 },
-                { participants: [senderId, receiverId] },
+                { members: [senderId, receiverId] },
             );
             console.log(chatToSendMessage)
             chatToSendMessage = doc;
 
             if (created) {
-                const participantWithoutSender = doc.participants.filter(p => p.toString() != socket.userId)
-                for (const participant of participantWithoutSender) {
-                    const participantSocket = userSockets[participant.toJSON()]
-                    if (participantSocket) {
-                        participantSocket.emit("new-chat", doc)
+                const senderUser = await User.findById(senderId);
+                chatToSendMessage.profile = senderUser.profile;
+                chatToSendMessage.chatName = senderUser.firstName ? `${senderUser.firstName} ${senderUser.lastName}` : senderUser.username;
+                const memberExceptSender = doc.members.filter(p => p.toString() != socket.userId)
+                for (const member of memberExceptSender) {
+                    const memberSocket = userSockets[member.toJSON()]
+                    if (memberSocket) {
+                        memberSocket.emit("new-chat", chatToSendMessage)
                     }
                 }
             }
@@ -227,7 +230,7 @@ const handleSendMessage = async (socket,
         } else {
 
 
-            let otherUser = chatToSendMessage.participants.find(
+            let otherUser = chatToSendMessage.members.find(
                 (p) => p._id.toString() !== senderId
             );
             const receiverSocket = userSockets[otherUser._id];
@@ -268,7 +271,7 @@ const handleTyping = (socket, { chatId, userId, isTyping, timestamp }) => {
         } in chat ${chatId} at ${timestamp}`
     );
 
-    // Broadcast typing event to other participants in the chat
+    // Broadcast typing event to other members in the chat
     socket.broadcast.emit("typing", { chatId, userId, isTyping, timestamp });
 }
 

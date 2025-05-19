@@ -188,18 +188,23 @@ const handleSendMessage = async (socket,
 
             if (created) {
                 const senderUser = await User.findById(senderId);
-                chatToSendMessage.profile = senderUser.profile;
-                chatToSendMessage.chatName = senderUser.firstName ? `${senderUser.firstName} ${senderUser.lastName}` : senderUser.username;
-                const memberExceptSender = doc.members.filter(p => p.toString() != socket.userId)
-                for (const member of memberExceptSender) {
+                const receiverUser = await User.findById(receiverId);
+                // const memberExceptSender = doc.members.filter(p => p.toString() != socket.userId)
+                for (const member of doc.members) {
                     const memberSocket = userSockets[member.toJSON()]
                     if (memberSocket) {
-                        memberSocket.emit("new-chat", chatToSendMessage)
+                        const meOrOther = member == senderUser._id.toString() ? receiverUser : senderUser;
+                        memberSocket.emit("new-chat", {
+                            ...chatToSendMessage.toJSON(),
+                            profile: meOrOther.profile,
+                            chatName: meOrOther.firstName ? `${meOrOther.firstName} ${meOrOther.lastName}` : meOrOther.username,
+
+                        })
                     }
                 }
             }
         }
-        console.log("chatToSendMessage", chatToSendMessage._id);
+
         if (!chatToSendMessage) {
             return cb({ error: "Chat not found or user not in chat" });
         }

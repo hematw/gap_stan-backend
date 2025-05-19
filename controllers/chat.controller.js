@@ -60,7 +60,7 @@ export const getChatMessages = asyncHandler(async (req, res) => {
     }
 
     const messages = await Message.find({ chat: chatId })
-        .sort({ createdAt: 1 })
+        .sort({ createdAt: 1 }).limit(20)
         .populate("files")
         .populate('sender', 'firstName lastName username email profile _id').lean();
 
@@ -315,7 +315,7 @@ export const createGroup = asyncHandler(async (req, res) => {
         isGroup: true,
         members: [...members, req.user.id],
         createdBy,
-        groupAdmin: createdBy,
+        groupAdmin: [createdBy],
         profile: path
     });
 
@@ -330,4 +330,41 @@ export const createGroup = asyncHandler(async (req, res) => {
     }
 
     res.status(201).json(groupChat);
+})
+
+export const getChatFilesAndMedia = asyncHandler(async (req, res) => {
+    const { chatId } = req.params;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+        return res.status(404).json({ message: "Chat does not exist." })
+    }
+
+    const filesAndMedia = await FilesAndMedia.find({ chat: chatId });
+
+    const files = [];
+    const links = [];
+    const media = [];
+
+    filesAndMedia.forEach(item => {
+        if (item.mediaType === "file") {
+            files.push(item)
+        } else if (["image", "video", "audio"].includes(item.mediaType)) {
+            media.push(item)
+        }
+    })
+
+    res.status(200).json({ files, media, links })
+})
+
+export const getChatMembers = asyncHandler(async (req, res) => {
+    const { chatId } = req.params;
+
+    const chat = await Chat.findById(chatId)
+        .populate('members', 'firstName lastName username email profile bio isOnline lastSeen');
+
+    if (!chat) {
+        return res.status(404).json({ message: "Chat does not exist." });
+    }
+    res.status(200).json({ members: chat.members, groupAdmin: chat.groupAdmin });
 })

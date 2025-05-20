@@ -368,3 +368,44 @@ export const getChatMembers = asyncHandler(async (req, res) => {
     }
     res.status(200).json({ members: chat.members, groupAdmin: chat.groupAdmin });
 })
+
+export const addToGroupChat = asyncHandler(async (req, res) => {
+    const { chatId } = req.params;
+    const userId = req.user._id;
+
+    const { newMembers } = req.body;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+        return res.status(404).json({ message: "Chat does not exist." });
+    }
+
+    if (!chat.groupAdmin.includes(userId)) {
+        return res.status(403).json({ message: "You are not authorized to perform this action." });
+    }
+
+    const events = [];
+
+    for (const member of newMembers) {
+        if (!chat.members.includes(member)) {
+            chat.members.push(member);
+        }
+        await chat.save();
+
+        const memberSocket = userSockets[member.toString()]
+        if (memberSocket) {
+            memberSocket.join(chatId);
+            io.to(chatId).emit("new-chat", chat)
+        }
+
+        events.push({
+            type: "user_added",
+            chat: chatId,
+            createdBy: userId,
+            targetUser: member,
+        })
+    }
+    const savedEvents = await Event.insertMany(events);
+
+    res.status(200).json({ message: "Members added successfully.", events: savedEvents });
+})

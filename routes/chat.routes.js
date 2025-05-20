@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createChatAndSendMessage, createGroup, deleteMessage, getChatFilesAndMedia, getChatMembers, getChatMessages, getChats, searchForChats, sendMessage, uploadFiles } from "../controllers/chat.controller.js";
+import { addToGroupChat, createChatAndSendMessage, createGroup, deleteMessage, getChatFilesAndMedia, getChatMembers, getChatMessages, getChats, searchForChats, sendMessage, uploadFiles } from "../controllers/chat.controller.js";
 import authHandler from "../middlewares/auth-handler.js";
 import upload from "../utils/multer.js";
 
@@ -25,6 +25,8 @@ chatRouter.post('/:chatId/upload', upload.array("files"), uploadFiles);
 chatRouter.post('/group', upload.single("profile"), createGroup);
 
 chatRouter.post('/:chatId', upload.array('media'), sendMessage);
+
+chatRouter.post('/:chatId/members', addToGroupChat);
 
 chatRouter.post('/new', createChatAndSendMessage);
 

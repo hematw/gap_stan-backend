@@ -6,6 +6,7 @@ import Event from "../models/Event.js";
 import FilesAndMedia from "../models/FileAndMedia.js";
 import formatChatDate from "../utils/formate-date.js";
 import { io, userSockets } from "../utils/socket.js";
+import generateEventMessage from "../utils/generateEventMessage.js";
 
 // await Event.create({
 //     type: "user_joined",
@@ -64,9 +65,17 @@ export const getChatMessages = asyncHandler(async (req, res) => {
         .populate("files")
         .populate('sender', 'firstName lastName username email profile _id').lean();
 
-    const events = await Event.find({ chat: chat._id }).lean();
+    const events = await Event.find({ chat: chat._id })
+        .populate("createdBy", "firstName lastName username")
+        .populate("targetUser", "firstName lastName username")
+        .lean();
 
-    const combinedData = [...messages, ...events];
+    const eventsWithMessage = events.map(e => ({
+        ...e,
+        content: e.content || generateEventMessage(e, req.user)
+    }))
+
+    const combinedData = [...messages, ...eventsWithMessage];
 
     const sortedData = combinedData.sort(
         (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
@@ -315,7 +324,7 @@ export const createGroup = asyncHandler(async (req, res) => {
         isGroup: true,
         members: [...members, req.user.id],
         createdBy,
-        groupAdmin: [createdBy],
+        groupAdmins: [createdBy],
         profile: path
     });
 
@@ -366,12 +375,12 @@ export const getChatMembers = asyncHandler(async (req, res) => {
     if (!chat) {
         return res.status(404).json({ message: "Chat does not exist." });
     }
-    res.status(200).json({ members: chat.members, groupAdmin: chat.groupAdmin });
+    res.status(200).json({ members: chat.members, groupAdmins: chat.groupAdmins });
 })
 
 export const addToGroupChat = asyncHandler(async (req, res) => {
     const { chatId } = req.params;
-    const userId = req.user._id;
+    const userId = req.user.id;
 
     const { newMembers } = req.body;
 
@@ -379,8 +388,8 @@ export const addToGroupChat = asyncHandler(async (req, res) => {
     if (!chat) {
         return res.status(404).json({ message: "Chat does not exist." });
     }
-
-    if (!chat.groupAdmin.includes(userId)) {
+    console.log(chat.groupAdmins, userId)
+    if (!chat.groupAdmins.includes(userId)) {
         return res.status(403).json({ message: "You are not authorized to perform this action." });
     }
 

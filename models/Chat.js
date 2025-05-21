@@ -21,7 +21,7 @@ const ChatSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: "Message",
     },
-    groupAdmin: {
+    groupAdmins: {
         type: [Schema.Types.ObjectId],
         ref: "User",
     },

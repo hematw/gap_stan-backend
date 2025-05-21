@@ -28,6 +28,8 @@ chatRouter.post('/:chatId', upload.array('media'), sendMessage);
 
 chatRouter.post('/:chatId/members', addToGroupChat);
 
+chatRouter.delete('/:chatId/members', addToGroupChat);
+
 chatRouter.post('/new', createChatAndSendMessage);
 
 export default chatRouter; 

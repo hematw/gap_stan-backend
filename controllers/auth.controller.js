@@ -14,6 +14,22 @@ export const registerUser = asyncHandler(async (req, res) => {
   console.log(req.body);
   const { username, email, password } = req.body;
 
+  if (!username || !email || !password) {
+    return res
+      .status(400)
+      .json({ message: "Username, email and password are required!" });
+  }
+
+  const user = await User.findOne({
+    $or: [{ email }, { username }],
+  });
+
+  if (user) {
+    return res.status(409).json({
+      message: "User with this email or username already exists!",
+    });
+  }
+
   const createdUser = await User.create({
     username,
     email,
@@ -24,12 +40,13 @@ export const registerUser = asyncHandler(async (req, res) => {
 
   const otp = Math.floor(100000 + Math.random() * 900000);
 
+  console.log("OTP", otp);
   createdUser.otp = otp;
   createdUser.otpExpiry = Date.now() + 5 * 60 * 60 * 1000; // 5 minutes
   await createdUser.save();
 
-  const x = await sendMail(createdUser, otp);
-  console.log(x);
+  // const x = await sendMail(createdUser, otp);
+  // console.log(x);
   return res
     .status(200)
     .json({ email: createdUser.email, username: createdUser.username });
@@ -88,21 +105,22 @@ export const checkUsername = asyncHandler(async (req, res) => {
 export const verifyOtp = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
 
-  const user = await User.findOne({ email: email, otp: otp });
+  const user = await User.findOne({ email: email, otp: +otp });
 
   if (!user) {
     return res.status(401).json({ message: "Verification failed" });
   }
 
-  const isExpired = user.otpExpiry - Date.now() > 0;
+  console.log(user.otpExpiry - Date.now());
+  const isExpired = user.otpExpiry - Date.now() < 0;
 
-  if (!isExpired) {
-    user.verifiedAt = Date.now();
-    await user.save();
-    const token = await user.generateToken();
-    return res.status(200).json({ user, token });
+  if (isExpired) {
+    return res.status(401).json({ message: "OTP Expired" });
   }
-  return res.status(401).json({ message: "Verification failed" });
+  user.verifiedAt = Date.now();
+  await user.save();
+  const token = await user.generateToken();
+  return res.status(200).json({ user, token });
 });
 
 export const resendOtp = asyncHandler(async (req, res) => {

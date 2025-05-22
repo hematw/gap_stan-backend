@@ -29,7 +29,7 @@ export const registerUser = asyncHandler(async (req, res) => {
   await createdUser.save();
 
   const x = await sendMail(createdUser, otp);
-  console.log(x)
+  console.log(x);
   return res
     .status(200)
     .json({ email: createdUser.email, username: createdUser.username });
@@ -49,19 +49,21 @@ export const loginUser = asyncHandler(async (req, res) => {
     $or: [{ email }, { username: email }],
   });
 
-  if (!foundUser.verifiedAt) { 
-    return res.status(401).json({message: "Please verify your account first."})
+  if (!foundUser || (await !foundUser.isPasswordCorrect(password))) {
+    return res.status(401).json({ message: "Email or password was wrong!" });
   }
 
-  if (foundUser && (await foundUser.isPasswordCorrect(password))) {
-
-    const token = await foundUser.generateToken();
+  if (!foundUser.verifiedAt) {
     return res
-      .status(200)
-      .cookie("token", token, cookieOptions)
-      .json({ token, user: foundUser });
+      .status(401)
+      .json({ message: "Please verify your account first." });
   }
-  return res.status(401).json({ message: "Email or password was wrong!" });
+
+  const token = await foundUser.generateToken();
+  return res
+    .status(200)
+    .cookie("token", token, cookieOptions)
+    .json({ token, user: foundUser });
 });
 
 // Logout route controller
@@ -86,15 +88,40 @@ export const checkUsername = asyncHandler(async (req, res) => {
 export const verifyOtp = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
 
-  const user = await User.findOne({ email: email, otp: otp })
+  const user = await User.findOne({ email: email, otp: otp });
 
-  const isExpired = (User.otpExpiry - Date.now()) > 0;
+  if (!user) {
+    return res.status(401).json({ message: "Verification failed" });
+  }
+
+  const isExpired = user.otpExpiry - Date.now() > 0;
 
   if (!isExpired) {
-    user.verifiedAt = Date.now()
-    await user.save()
-    const token = await user.generateToken()
-    return res.status(200).json({ user, token })
+    user.verifiedAt = Date.now();
+    await user.save();
+    const token = await user.generateToken();
+    return res.status(200).json({ user, token });
   }
-  return res.status(401).json({ message: "Verification failed" })
-})
+  return res.status(401).json({ message: "Verification failed" });
+});
+
+export const resendOtp = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email: email });
+
+  if (!user) {
+    return res.status(401).json({ message: "Verification failed" });
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000);
+
+  user.otp = otp;
+  user.otpExpiry = Date.now() + 5 * 60 * 60 * 1000; // 5 minutes
+  await user.save();
+
+  const x = await sendMail(user, otp);
+  console.log("Verification email sending res", x);
+
+  return res.status(200).json({ message: "Verification email sent" });
+});

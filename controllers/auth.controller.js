@@ -66,13 +66,13 @@ export const loginUser = asyncHandler(async (req, res) => {
     $or: [{ email }, { username: email }],
   });
 
-  if (!foundUser || (await !foundUser.isPasswordCorrect(password))) {
+  if (!foundUser || !(await foundUser.isPasswordCorrect(password))) {
     return res.status(401).json({ message: "Email or password was wrong!" });
   }
 
   if (!foundUser.verifiedAt) {
     return res
-      .status(401)
+      .status(403)
       .json({ message: "Please verify your account first." });
   }
 

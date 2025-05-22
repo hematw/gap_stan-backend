@@ -21,7 +21,7 @@ export const getUsers = asyncHandler(async (req, res) => {
         .sort({ createdAt: -1 })
         .select("-password")
         .lean();
-    return res.status(200).json({users});
+    return res.status(200).json({ users });
 });
 
 export const createUser = asyncHandler(async (req, res) => {

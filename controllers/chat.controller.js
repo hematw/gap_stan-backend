@@ -455,7 +455,7 @@ export const addToGroupChat = asyncHandler(async (req, res) => {
 });
 
 export const removeFromChat = asyncHandler(async (req, res) => {
-    const { chatId, memberToRemove } = req.params;
+    const { chatId, memberId } = req.params;
     const userId = req.user.id;
 
     let chat = await Chat.findById(chatId);
@@ -473,13 +473,13 @@ export const removeFromChat = asyncHandler(async (req, res) => {
     const events = [];
 
     chat = await Chat.findByIdAndUpdate(chatId, {
-        $pull: { members: memberToRemove },
+        $pull: { members: memberId },
     }, { new: true }).populate(
         "members",
         "firstName lastName username email profile bio isOnline lastSeen"
     ).populate("groupAdmins").lean();
 
-    const memberSocket = userSockets[memberToRemove.toString()];
+    const memberSocket = userSockets[memberId.toString()];
     if (memberSocket) {
     }
 
@@ -487,7 +487,7 @@ export const removeFromChat = asyncHandler(async (req, res) => {
         type: "user_removed",
         chat: chatId,
         createdBy: userId,
-        targetUser: memberToRemove,
+        targetUser: memberId,
     });
     const savedEvents = await Event.insertMany(events);
 
@@ -499,3 +499,77 @@ export const removeFromChat = asyncHandler(async (req, res) => {
             ...chat
         });
 });
+
+export const leaveGroup = asyncHandler(async (req, res) => {
+    const { chatId } = req.params;
+    const userId = req.user.id;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+        return res.status(404).json({ message: "Chat does not exist." });
+    }
+    if (!chat.members.includes(userId)) {
+        return res
+            .status(403)
+            .json({ message: "You are not authorized to perform this action." });
+    }
+    const events = [];
+    chat.members = chat.members.filter((member) => member.toString() !== userId);
+    await chat.save();
+    const memberSocket = userSockets[userId.toString()];
+    if (memberSocket) {
+        memberSocket.leave(chatId);
+    }
+    events.push({
+        type: "user_left",
+        chat: chatId,
+        createdBy: userId,
+        targetUser: userId,
+    });
+    const savedEvents = await Event.insertMany(events);
+    res
+        .status(200)
+        .json({
+            message: "You have left the group.",
+            events: savedEvents,
+            ...chat
+        });
+}
+);
+
+export const makeAdmin = asyncHandler(async (req, res) => {
+    const { chatId, memberId } = req.params;
+    const userId = req.user.id;
+
+    let chat = await Chat.findById(chatId);
+    if (!chat) {
+        return res.status(404).json({ message: "Chat does not exist." });
+    }
+    if (!chat.groupAdmins.includes(userId)) {
+        return res
+            .status(403)
+            .json({ message: "You are not authorized to perform this action." });
+    }
+    if (chat.groupAdmins.includes(memberId)) {
+        return res
+            .status(400)
+            .json({ message: "User is already an admin." });
+    }
+    chat.groupAdmins.push(memberId);
+    (await chat.save())
+
+    chat = await Chat.findById(chatId)
+        .populate("members", "firstName lastName username email profile bio isOnline lastSeen")
+        .populate("groupAdmins", "firstName lastName username email profile bio isOnline lastSeen")
+        .lean();
+
+    const memberSocket = userSockets[memberId.toString()];
+    if (memberSocket) {
+        memberSocket.join(chatId);
+        io.to(chatId).emit("new-chat", chat);
+    }
+    res
+        .status(200)
+        .json({ message: "User has been made admin.", chat, events: [] });
+}
+);

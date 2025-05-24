@@ -563,13 +563,40 @@ export const makeAdmin = asyncHandler(async (req, res) => {
         .populate("groupAdmins", "firstName lastName username email profile bio isOnline lastSeen")
         .lean();
 
-    const memberSocket = userSockets[memberId.toString()];
-    if (memberSocket) {
-        memberSocket.join(chatId);
-        io.to(chatId).emit("new-chat", chat);
-    }
     res
         .status(200)
         .json({ message: "User has been made admin.", chat, events: [] });
+}
+);
+
+export const dismissAdmin =  asyncHandler(async (req, res) => {
+    const { chatId, memberId } = req.params;
+    const userId = req.user.id;
+
+    let chat = await Chat.findById(chatId);
+    if (!chat) {
+        return res.status(404).json({ message: "Chat does not exist." });
+    }
+    if (!chat.groupAdmins.includes(userId)) {
+        return res
+            .status(403)
+            .json({ message: "You are not authorized to perform this action." });
+    }
+    if (!chat.groupAdmins.includes(memberId)) {
+        return res
+            .status(400)
+            .json({ message: "User already is not admin." });
+    }
+    chat.groupAdmins = chat.groupAdmins.filter(m=> m.toString() !== memberId);
+    (await chat.save())
+
+    chat = await Chat.findById(chatId)
+        .populate("members", "firstName lastName username email profile bio isOnline lastSeen")
+        .populate("groupAdmins", "firstName lastName username email profile bio isOnline lastSeen")
+        .lean();
+
+    res
+        .status(200)
+        .json({ message: "User has been dismissed as admin.", chat, events: [] });
 }
 );

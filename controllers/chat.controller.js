@@ -343,7 +343,7 @@ export const createGroup = asyncHandler(async (req, res) => {
 
     let path;
     if (req.file) {
-        path = `/uploads/${req.file.originalname}`;
+        path = `/uploads/${req.file.filename}`;
     }
 
     const groupChat = await Chat.create({

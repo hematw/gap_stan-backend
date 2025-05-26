@@ -33,6 +33,12 @@ const generateEventMessage = (eventData, user) => {
 
         case "call_missed":
             return `Missed call from ${createdBy.firstName || createdBy.username}`;
+       
+        case "made_admin":
+            return `${createdBy.firstName || createdBy.username} make ${targetUser.firstName || targetUser.username} as Admin`;
+       
+        case "remove_admin":
+            return `${createdBy.firstName || createdBy.username} make ${targetUser.firstName || targetUser.username} as Admin`;
 
         default:
             return `An event occurred`;

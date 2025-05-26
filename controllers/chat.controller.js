@@ -429,9 +429,9 @@ export const addToGroupChat = asyncHandler(async (req, res) => {
     const events = [];
 
     for (const member of newMembers) {
-        if (!chat.members.includes(member)) {
-            chat.members.push(member);
-        }
+        if (chat.members.includes(member)) continue;
+        
+        chat.members.push(member);
         await chat.save();
 
         const memberSocket = userSockets[member.toString()];
@@ -563,13 +563,21 @@ export const makeAdmin = asyncHandler(async (req, res) => {
         .populate("groupAdmins", "firstName lastName username email profile bio isOnline lastSeen")
         .lean();
 
+
+    const event = await Event.create({
+        type: "made_admin",
+        chat: chatId,
+        createdBy: userId,
+        targetUser: memberId,
+    })
+
     res
         .status(200)
-        .json({ message: "User has been made admin.", chat, events: [] });
+        .json({ message: "User has been made admin.", chat, events: [event] });
 }
 );
 
-export const dismissAdmin =  asyncHandler(async (req, res) => {
+export const dismissAdmin = asyncHandler(async (req, res) => {
     const { chatId, memberId } = req.params;
     const userId = req.user.id;
 
@@ -587,7 +595,7 @@ export const dismissAdmin =  asyncHandler(async (req, res) => {
             .status(400)
             .json({ message: "User already is not admin." });
     }
-    chat.groupAdmins = chat.groupAdmins.filter(m=> m.toString() !== memberId);
+    chat.groupAdmins = chat.groupAdmins.filter(m => m.toString() !== memberId);
     (await chat.save())
 
     chat = await Chat.findById(chatId)
@@ -595,8 +603,15 @@ export const dismissAdmin =  asyncHandler(async (req, res) => {
         .populate("groupAdmins", "firstName lastName username email profile bio isOnline lastSeen")
         .lean();
 
+    const event = await Event.create({
+        type: "remove_admin",
+        chat: chatId,
+        createdBy: userId,
+        targetUser: memberId,
+    })
+
     res
         .status(200)
-        .json({ message: "User has been dismissed as admin.", chat, events: [] });
+        .json({ message: "User has been dismissed as admin.", chat, events: [event] });
 }
 );

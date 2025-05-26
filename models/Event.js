@@ -11,6 +11,8 @@ const eventSchema = new mongoose.Schema({
             'call_started',
             'call_missed',
             'message_deleted',
+            'made_admin',
+            'remove_admin',
             'custom_notice'
         ],
         required: true

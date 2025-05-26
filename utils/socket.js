@@ -270,14 +270,14 @@ const handleSendMessage = async (socket,
     }
 }
 
-const handleTyping = (socket, { chatId, userId, isTyping, timestamp }) => {
+const handleTyping = (socket, { chatId, userId, isTyping, timestamp, content }) => {
     console.log(
         `User ${userId} is ${isTyping ? "typing" : "not typing"
         } in chat ${chatId} at ${timestamp}`
     );
 
     // Broadcast typing event to other members in the chat
-    socket.broadcast.emit("typing", { chatId, userId, isTyping, timestamp });
+    socket.broadcast.emit("typing", { chatId, userId, isTyping, timestamp, content });
 }
 
 const handleMessageDelivery = async (socket, { messageId }) => {

@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Correct uploads path
-const uploadPath = path.resolve(__dirname, "../public/uploads");
+const uploadPath = path.resolve(__dirname, "../../public/uploads");
 
 // Create uploads folder if it doesn't exist
 if (!fs.existsSync(uploadPath)) {

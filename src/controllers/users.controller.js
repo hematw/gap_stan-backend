@@ -78,3 +78,19 @@ export const deleteUser = asyncHandler(async (req, res) => {
     }
     return res.status(200).json({ message: "User deleted successfully" });
 });
+
+// PUT /users/:id/public-key
+export const uploadPublicKey = asyncHandler(async (req, res) => {
+    if (req.user.id !== req.params.id) return res.status(403).json({ error: "Forbidden" });
+    const { publicKey } = req.body;
+    if (!publicKey) return res.status(400).json({ error: "Missing publicKey" });
+    await User.findByIdAndUpdate(req.params.id, { publicKey });
+    res.json({ success: true });
+});
+
+// GET /users/:id/public-key
+export const getPublicKey = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.params.id).select("publicKey");
+    if (!user || !user.publicKey) return res.status(404).json({ error: "Not found" });
+    res.json({ publicKey: user.publicKey });
+});

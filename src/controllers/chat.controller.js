@@ -420,17 +420,17 @@ export const addToGroupChat = asyncHandler(async (req, res) => {
         return res.status(404).json({ message: "Chat does not exist." });
     }
     console.log(chat.groupAdmins, userId);
-    if (!chat.groupAdmins.includes(userId)) {
-        return res
-            .status(403)
-            .json({ message: "You are not authorized to perform this action." });
-    }
+    // if (!chat.groupAdmins.includes(userId)) {
+    //     return res
+    //         .status(403)
+    //         .json({ message: "You are not authorized to perform this action." });
+    // }
 
     const events = [];
 
     for (const member of newMembers) {
         if (chat.members.includes(member)) continue;
-        
+
         chat.members.push(member);
         await chat.save();
 
@@ -526,13 +526,17 @@ export const leaveGroup = asyncHandler(async (req, res) => {
         createdBy: userId,
         targetUser: userId,
     });
+
     const savedEvents = await Event.insertMany(events);
+    events.forEach(event => {
+        io.to(chatId).emit("message-received", event);
+    });
     res
         .status(200)
         .json({
             message: "You have left the group.",
             events: savedEvents,
-            ...chat
+            ...chat.toObject()
         });
 }
 );
@@ -615,3 +619,46 @@ export const dismissAdmin = asyncHandler(async (req, res) => {
         .json({ message: "User has been dismissed as admin.", chat, events: [event] });
 }
 );
+
+export const editGroupChat = asyncHandler(async (req, res) => {
+    const { chatId } = req.params;
+    const userId = req.user.id;
+    const { chatName } = req.body;
+
+    let chat = await Chat.findById(chatId);
+    if (!chat) {
+        return res.status(404).json({ message: "Chat does not exist." });
+    }
+
+    // if (!chat.groupAdmins.includes(userId)) {
+    //     return res.status(403).json({ message: "You are not authorized to perform this action." });
+    // }
+
+    if (chatName) chat.chatName = chatName;
+
+    if (req.file) {
+        chat.profile = `/uploads/${req.file.filename}`;
+    }
+
+    await chat.save();
+
+    const updatedChat = await Chat.findById(chatId)
+        .lean();
+
+    // Create event
+    const event = await Event.create({
+        type: "custom_notice",
+        chat: chatId,
+        createdBy: userId,
+        content: chatName ? `Group name changed to ${chatName} by ${req.user.username}` : "Group info updated.",
+    });
+
+    // Emit using a more semantically correct event name
+    io.to(chatId).emit("group-event", {event:{...event.toObject(), contentType: "event"}, chat: updatedChat});
+
+    res.status(200).json({
+        message: "Group chat updated successfully.",
+        chat: updatedChat,
+        events: [event]
+    });
+});

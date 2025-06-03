@@ -18,7 +18,9 @@ const messageSchema = new Schema({
         type: String,
         enum: ["sent", "delivered", "seen"],
         default: "sent"
-    }
+    },
+    iv: { type: String, required: true },   // IV (base64)
+    fileIv: { type: String },
 }, { timestamps: true })
 
 const Message = model("Message", messageSchema);

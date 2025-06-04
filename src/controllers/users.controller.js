@@ -81,16 +81,46 @@ export const deleteUser = asyncHandler(async (req, res) => {
 
 // PUT /users/:id/public-key
 export const uploadPublicKey = asyncHandler(async (req, res) => {
-    if (req.user.id !== req.params.id) return res.status(403).json({ error: "Forbidden" });
-    const { publicKey } = req.body;
-    if (!publicKey) return res.status(400).json({ error: "Missing publicKey" });
-    await User.findByIdAndUpdate(req.params.id, { publicKey });
-    res.json({ success: true });
+    console.log("user", req.user);
+
+    let { publicKey } = req.body;
+
+    if (!publicKey) {
+        return res.status(400).json({ error: "Missing publicKey" });
+    }
+
+    // Handle stringified keys (just in case)
+    if (typeof publicKey === 'string') {
+        try {
+            publicKey = JSON.parse(publicKey);
+        } catch {
+            return res.status(400).json({ error: "Invalid publicKey format" });
+        }
+    }
+
+    const requiredFields = ['crv', 'ext', 'kty', 'x', 'y'];
+    const isValid = requiredFields.every(field => field in publicKey);
+
+    if (!isValid) {
+        return res.status(400).json({ error: "publicKey missing required fields" });
+    }
+
+    const user= await User.findByIdAndUpdate(req.user.id, { publicKey });
+
+    if (!user) {
+        return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ success: true, user });
 });
+
 
 // GET /users/:id/public-key
 export const getPublicKey = asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.id).select("publicKey");
-    if (!user || !user.publicKey) return res.status(404).json({ error: "Not found" });
+
+    if (!user || !user.publicKey) {
+        return res.status(404).json({ error: "Public key Not found" });
+    }
     res.json({ publicKey: user.publicKey });
 });

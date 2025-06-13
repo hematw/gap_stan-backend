@@ -159,11 +159,11 @@ const handleMarsAsSeen = async (socket, { chatId, userId }) => {
 }
 
 const handleSendMessage = async (socket,
-    { chatId, text, files = [], reactions, senderId, receiverId, replayTo },
+    { chatId, text, files = [], reactions, senderId, receiverId, replayTo, iv },
     cb
 ) => {
     // const { chatId, text, mediaType, reactions, userId } = data;
-    // console.log("Message received:", data);
+    console.log("Message received:", chatId, text, files, reactions, senderId, receiverId, replayTo, iv);
     try {
         let chatToSendMessage;
 
@@ -218,6 +218,7 @@ const handleSendMessage = async (socket,
             files: files.map((file) => file._id),
             replayTo,
             reactions: reactions || [],
+            iv: iv
         });
 
         chatToSendMessage.lastMessage = savedMessage._id;

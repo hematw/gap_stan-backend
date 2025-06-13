@@ -19,7 +19,7 @@ const messageSchema = new Schema({
         enum: ["sent", "delivered", "seen"],
         default: "sent"
     },
-    iv: { type: String, required: true },   // IV (base64)
+    iv: { type: [Number], required: true },   // IV (base64)
     fileIv: { type: String },
 }, { timestamps: true })
 

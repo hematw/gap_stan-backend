@@ -25,7 +25,7 @@ export const getChats = asyncHandler(async (req, res) => {
             "firstName lastName username email profile isOnline lastSeen bio"
         )
         .populate("lastMessage")
-        .sort({ createdAt: -1 });
+        .sort({ updatedAt: -1 });
 
     const formattedChats = chats.map((chat) => {
         if (!chat.isGroup) {
